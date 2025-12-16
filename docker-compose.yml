@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  promanager:
+    build: .
+    container_name: promanager
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    networks:
+      - webnet
+    labels:
+      - "com.promanager.description=Gestor de Proyectos ProManager"
+
+networks:
+  webnet:
+    driver: bridge

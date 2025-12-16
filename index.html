@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Gestor de proyectos moderno y premium para organizar tus proyectos y tareas">
+  <title>ProManager - Gestor de Proyectos</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo">
+        <span class="logo-icon">📊</span>
+        <span>ProManager</span>
+      </div>
+      
+      <nav>
+        <ul class="nav-menu">
+          <li class="nav-item active" data-view="dashboard">
+            <span class="nav-icon">🏠</span>
+            <span>Dashboard</span>
+          </li>
+          <li class="nav-item" data-view="projects">
+            <span class="nav-icon">📁</span>
+            <span>Proyectos</span>
+          </li>
+          <li class="nav-item" data-view="tasks">
+            <span class="nav-icon">✓</span>
+            <span>Tareas</span>
+          </li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Dashboard View -->
+      <section id="dashboard-view" class="view">
+        <div class="content-header">
+          <h1 class="content-title">Dashboard</h1>
+          <p class="content-subtitle">Resumen de tus proyectos y tareas</p>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+          <div class="stat-card purple">
+            <div class="stat-header">
+              <span class="stat-icon">📁</span>
+            </div>
+            <div class="stat-value" id="stat-total-projects">0</div>
+            <div class="stat-label">Proyectos Totales</div>
+          </div>
+
+          <div class="stat-card blue">
+            <div class="stat-header">
+              <span class="stat-icon">🚀</span>
+            </div>
+            <div class="stat-value" id="stat-active-projects">0</div>
+            <div class="stat-label">Proyectos Activos</div>
+          </div>
+
+          <div class="stat-card green">
+            <div class="stat-header">
+              <span class="stat-icon">✓</span>
+            </div>
+            <div class="stat-value" id="stat-completed-tasks">0</div>
+            <div class="stat-label">Tareas Completadas</div>
+          </div>
+
+          <div class="stat-card pink">
+            <div class="stat-header">
+              <span class="stat-icon">⏱️</span>
+            </div>
+            <div class="stat-value" id="stat-pending-tasks">0</div>
+            <div class="stat-label">Tareas Pendientes</div>
+          </div>
+        </div>
+
+        <!-- Recent Projects -->
+        <div class="content-header mt-xl">
+          <h2 class="card-title">Proyectos Recientes</h2>
+        </div>
+        <div id="recent-projects" class="projects-grid"></div>
+      </section>
+
+      <!-- Projects View -->
+      <section id="projects-view" class="view hidden">
+        <div class="content-header">
+          <h1 class="content-title">Proyectos</h1>
+          <p class="content-subtitle">Gestiona todos tus proyectos</p>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="search-projects" class="search-input" placeholder="Buscar proyectos...">
+          </div>
+          <div class="toolbar-actions">
+            <select id="filter-projects" class="form-select">
+              <option value="all">Todos los proyectos</option>
+              <option value="pending">Pendientes</option>
+              <option value="progress">En Progreso</option>
+              <option value="completed">Completados</option>
+            </select>
+            <button class="btn btn-primary" id="btn-new-project">
+              <span>➕</span>
+              <span>Nuevo Proyecto</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Projects Grid -->
+        <div id="projects-list" class="projects-grid"></div>
+      </section>
+
+      <!-- Tasks View -->
+      <section id="tasks-view" class="view hidden">
+        <div class="content-header">
+          <h1 class="content-title">Tareas</h1>
+          <p class="content-subtitle">Todas tus tareas en un solo lugar</p>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="search-tasks" class="search-input" placeholder="Buscar tareas...">
+          </div>
+          <div class="toolbar-actions">
+            <select id="filter-tasks" class="form-select">
+              <option value="all">Todas las tareas</option>
+              <option value="pending">Pendientes</option>
+              <option value="progress">En Progreso</option>
+              <option value="completed">Completadas</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tasks List -->
+        <div id="tasks-list" class="tasks-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Project Modal -->
+  <div id="project-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="project-modal-title">Nuevo Proyecto</h2>
+        <button class="modal-close" id="close-project-modal">✕</button>
+      </div>
+      <form id="project-form">
+        <input type="hidden" id="project-id">
+        
+        <div class="form-group">
+          <label class="form-label" for="project-name">Nombre del Proyecto</label>
+          <input type="text" id="project-name" class="form-input" placeholder="Ej: Desarrollo Web" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="project-description">Descripción</label>
+          <textarea id="project-description" class="form-textarea" placeholder="Describe tu proyecto..." required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="project-status">Estado</label>
+          <select id="project-status" class="form-select" required>
+            <option value="pending">Pendiente</option>
+            <option value="progress">En Progreso</option>
+            <option value="completed">Completado</option>
+          </select>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="cancel-project">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <span id="project-submit-text">Crear Proyecto</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Task Modal -->
+  <div id="task-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="task-modal-title">Nueva Tarea</h2>
+        <button class="modal-close" id="close-task-modal">✕</button>
+      </div>
+      <form id="task-form">
+        <input type="hidden" id="task-id">
+        <input type="hidden" id="task-project-id">
+        
+        <div class="form-group">
+          <label class="form-label" for="task-title">Título de la Tarea</label>
+          <input type="text" id="task-title" class="form-input" placeholder="Ej: Diseñar interfaz" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="task-description">Descripción</label>
+          <textarea id="task-description" class="form-textarea" placeholder="Describe la tarea..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="task-project">Proyecto</label>
+          <select id="task-project" class="form-select" required>
+            <option value="">Selecciona un proyecto</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="task-status">Estado</label>
+          <select id="task-status" class="form-select" required>
+            <option value="pending">Pendiente</option>
+            <option value="progress">En Progreso</option>
+            <option value="completed">Completada</option>
+          </select>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="cancel-task">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <span id="task-submit-text">Crear Tarea</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script src="app.js"></script>
+</body>
+</html>

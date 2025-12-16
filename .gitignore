@@ -1,0 +1,27 @@
+# Archivos de desarrollo
+node_modules/
+npm-debug.log
+yarn-error.log
+.env
+.env.local
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Archivos temporales
+*.log
+*.tmp
+temp/
+tmp/
+
+# Archivos de artifacts (brain)
+.gemini/
