@@ -4,7 +4,7 @@ services:
   promanager:
     image: elitealma/promanager:latest
     networks:
-      - traefik-public
+      - chatwoot_traefik_public
     deploy:
       replicas: 1
       restart_policy:
@@ -12,6 +12,7 @@ services:
       labels:
         # Habilitar Traefik
         - "traefik.enable=true"
+        - "traefik.docker.network=chatwoot_traefik_public"
 
         # Router para HTTP (redirige a HTTPS)
         - "traefik.http.routers.promanager.rule=Host(`gestor.pegasus360agency.com`)"
@@ -21,7 +22,7 @@ services:
         # Router para HTTPS
         - "traefik.http.routers.promanager-secure.rule=Host(`gestor.pegasus360agency.com`)"
         - "traefik.http.routers.promanager-secure.entrypoints=websecure"
-        - "traefik.http.routers.promanager-secure.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.promanager-secure.tls.certresolver=le"
 
         # Servicio
         - "traefik.http.services.promanager.loadbalancer.server.port=80"
@@ -31,5 +32,5 @@ services:
         - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
 
 networks:
-  traefik-public:
+  chatwoot_traefik_public:
     external: true
