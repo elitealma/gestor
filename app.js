@@ -1,64 +1,85 @@
+const SUPABASE_URL = 'https://vwlfyautuvioxfzvogah.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3bGZ5YXV0dXZpb3hmenZvZ2FoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzA0NDYsImV4cCI6MjA3ODAwNjQ0Nn0.4OjTvjf6HfilcdjFZaLHOkTqcjvMBEU7nRG5QWLWj-Y';
+const clientSB = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 // ===== DATA MODEL =====
 class DataManager {
   constructor() {
-    this.projects = this.loadProjects();
-    this.tasks = this.loadTasks();
+    this.projects = [];
+    this.tasks = [];
     this.currentView = 'dashboard';
   }
 
-  // LocalStorage Management
-  loadProjects() {
-    const data = localStorage.getItem('projects');
-    return data ? JSON.parse(data) : [];
-  }
+  // Supabase Data Fetching
+  async loadInitialData() {
+    try {
+      const [{ data: projects }, { data: tasks }] = await Promise.all([
+        clientSB.from('projects').select('*').order('created_at', { ascending: false }),
+        clientSB.from('tasks').select('*').order('created_at', { ascending: false })
+      ]);
 
-  loadTasks() {
-    const data = localStorage.getItem('tasks');
-    return data ? JSON.parse(data) : [];
-  }
+      this.projects = (projects || []).map(p => ({
+        ...p,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at
+      }));
 
-  saveProjects() {
-    localStorage.setItem('projects', JSON.stringify(this.projects));
-  }
+      this.tasks = (tasks || []).map(t => ({
+        ...t,
+        projectId: t.project_id,
+        dueDate: t.due_date,
+        createdAt: t.created_at,
+        updatedAt: t.updated_at
+      }));
 
-  saveTasks() {
-    localStorage.setItem('tasks', JSON.stringify(this.tasks));
+      return true;
+    } catch (error) {
+      console.error('Error cargando datos de Supabase:', error);
+      return false;
+    }
   }
 
   // Project CRUD
-  createProject(projectData) {
-    const project = {
-      id: Date.now().toString(),
-      name: projectData.name,
-      description: projectData.description,
-      status: projectData.status,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    this.projects.push(project);
-    this.saveProjects();
+  async createProject(projectData) {
+    const { data, error } = await supabase
+      .from('projects')
+      .insert([{
+        name: projectData.name,
+        description: projectData.description,
+        status: projectData.status
+      }])
+      .select();
+
+    if (error) throw error;
+    const project = { ...data[0], createdAt: data[0].created_at, updatedAt: data[0].updated_at };
+    this.projects.unshift(project);
     return project;
   }
 
-  updateProject(id, projectData) {
+  async updateProject(id, projectData) {
+    const { data, error } = await supabase
+      .from('projects')
+      .update({
+        name: projectData.name,
+        description: projectData.description,
+        status: projectData.status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
+    const project = { ...data[0], createdAt: data[0].created_at, updatedAt: data[0].updated_at };
     const index = this.projects.findIndex(p => p.id === id);
-    if (index !== -1) {
-      this.projects[index] = {
-        ...this.projects[index],
-        ...projectData,
-        updatedAt: new Date().toISOString()
-      };
-      this.saveProjects();
-      return this.projects[index];
-    }
-    return null;
+    if (index !== -1) this.projects[index] = project;
+    return project;
   }
 
-  deleteProject(id) {
+  async deleteProject(id) {
+    const { error } = await clientSB.from('projects').delete().eq('id', id);
+    if (error) throw error;
     this.projects = this.projects.filter(p => p.id !== id);
     this.tasks = this.tasks.filter(t => t.projectId !== id);
-    this.saveProjects();
-    this.saveTasks();
   }
 
   getProject(id) {
@@ -66,39 +87,62 @@ class DataManager {
   }
 
   // Task CRUD
-  createTask(taskData) {
+  async createTask(taskData) {
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert([{
+        title: taskData.title,
+        description: taskData.description,
+        project_id: taskData.projectId,
+        status: taskData.status,
+        due_date: taskData.dueDate || new Date().toISOString().split('T')[0]
+      }])
+      .select();
+
+    if (error) throw error;
     const task = {
-      id: Date.now().toString(),
-      title: taskData.title,
-      description: taskData.description,
-      projectId: taskData.projectId,
-      status: taskData.status,
-      dueDate: taskData.dueDate || new Date().toISOString().split('T')[0], // YYYY-MM-DD
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      ...data[0],
+      projectId: data[0].project_id,
+      dueDate: data[0].due_date,
+      createdAt: data[0].created_at,
+      updatedAt: data[0].updated_at
     };
-    this.tasks.push(task);
-    this.saveTasks();
+    this.tasks.unshift(task);
     return task;
   }
 
-  updateTask(id, taskData) {
+  async updateTask(id, taskData) {
+    const updatePayload = {};
+    if (taskData.title) updatePayload.title = taskData.title;
+    if (taskData.description) updatePayload.description = taskData.description;
+    if (taskData.projectId) updatePayload.project_id = taskData.projectId;
+    if (taskData.status) updatePayload.status = taskData.status;
+    if (taskData.dueDate) updatePayload.due_date = taskData.dueDate;
+    updatePayload.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(updatePayload)
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
+    const task = {
+      ...data[0],
+      projectId: data[0].project_id,
+      dueDate: data[0].due_date,
+      createdAt: data[0].created_at,
+      updatedAt: data[0].updated_at
+    };
     const index = this.tasks.findIndex(t => t.id === id);
-    if (index !== -1) {
-      this.tasks[index] = {
-        ...this.tasks[index],
-        ...taskData,
-        updatedAt: new Date().toISOString()
-      };
-      this.saveTasks();
-      return this.tasks[index];
-    }
-    return null;
+    if (index !== -1) this.tasks[index] = task;
+    return task;
   }
 
-  deleteTask(id) {
+  async deleteTask(id) {
+    const { error } = await clientSB.from('tasks').delete().eq('id', id);
+    if (error) throw error;
     this.tasks = this.tasks.filter(t => t.id !== id);
-    this.saveTasks();
   }
 
   getTask(id) {
@@ -136,6 +180,59 @@ class DataManager {
   }
 }
 
+// ===== AUTH CONTROLLER =====
+class AuthController {
+  constructor(uiController) {
+    this.ui = uiController;
+    this.user = null;
+    this.init();
+  }
+
+  async init() {
+    const { data: { session } } = await clientSB.auth.getSession();
+    this.user = session?.user || null;
+    this.updateUIState();
+
+    clientSB.auth.onAuthStateChange(async (_event, session) => {
+      this.user = session?.user || null;
+      this.updateUIState();
+      await this.ui.dataManager.loadInitialData(); // Reload data on auth state change
+      this.ui.refreshCurrentView();
+    });
+  }
+
+  async login(email, password) {
+    const { error } = await clientSB.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  }
+
+  async register(email, password) {
+    const { error } = await clientSB.auth.signUp({ email, password });
+    if (error) throw error;
+  }
+
+  async logout() {
+    await clientSB.auth.signOut();
+  }
+
+  isAdmin() {
+    return !!this.user;
+  }
+
+  updateUIState() {
+    const isAdmin = this.isAdmin();
+    document.body.classList.toggle('guest-mode', !isAdmin);
+    document.getElementById('nav-login').classList.toggle('hidden', isAdmin);
+    document.getElementById('nav-logout').classList.toggle('hidden', !isAdmin);
+
+    // Hide/show admin actions
+    document.querySelectorAll('.admin-only').forEach(el => {
+      el.classList.toggle('hidden', !isAdmin);
+    });
+  }
+}
+
+
 // ===== UI CONTROLLER =====
 class UIController {
   constructor(dataManager) {
@@ -146,8 +243,9 @@ class UIController {
   init() {
     this.currentDate = new Date();
     this.setupEventListeners();
-    this.renderDashboard();
-    this.updateStats();
+    this.dataManager.loadInitialData().then(() => {
+      this.refreshCurrentView();
+    });
   }
 
   setupEventListeners() {
@@ -155,12 +253,25 @@ class UIController {
     document.querySelectorAll('.nav-item').forEach(item => {
       item.addEventListener('click', (e) => {
         const view = e.currentTarget.getAttribute('data-view');
-        this.switchView(view);
+        if (view) this.switchView(view);
       });
     });
 
+    document.getElementById('nav-logout').addEventListener('click', () => auth.logout());
+    document.getElementById('nav-login').addEventListener('click', () => this.openAuthModal());
+
+    // Auth Modal
+    document.getElementById('close-auth-modal').addEventListener('click', () => this.closeAuthModal());
+    document.getElementById('auth-form').addEventListener('submit', (e) => this.handleAuthSubmit(e));
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+      tab.addEventListener('click', (e) => this.switchAuthTab(e.target.getAttribute('data-tab')));
+    });
+
     // Project Modal
-    document.getElementById('btn-new-project').addEventListener('click', () => this.openProjectModal());
+    document.getElementById('btn-new-project').addEventListener('click', () => {
+      if (!auth.isAdmin()) return this.openAuthModal();
+      this.openProjectModal();
+    });
     document.getElementById('close-project-modal').addEventListener('click', () => this.closeProjectModal());
     document.getElementById('cancel-project').addEventListener('click', () => this.closeProjectModal());
     document.getElementById('project-form').addEventListener('submit', (e) => this.handleProjectSubmit(e));
@@ -318,7 +429,7 @@ class UIController {
             <h3 class="project-title">${this.escapeHtml(project.name)}</h3>
             ${statusBadge}
           </div>
-          <div class="project-actions">
+          <div class="project-actions admin-only">
             <button class="btn-icon btn-secondary" onclick="ui.openTaskModal('${project.id}')" title="Agregar tarea">
               ➕
             </button>
@@ -404,7 +515,7 @@ class UIController {
             ${statusBadge}
           </div>
         </div>
-        <div class="task-actions">
+        <div class="task-actions admin-only">
           <button class="btn-icon btn-secondary" onclick="ui.editTask('${task.id}')" title="Editar tarea">
             ✏️
           </button>
@@ -522,8 +633,10 @@ class UIController {
     document.getElementById('project-modal').classList.add('hidden');
   }
 
-  handleProjectSubmit(e) {
+  async handleProjectSubmit(e) {
     e.preventDefault();
+    if (!auth.isAdmin()) return this.openAuthModal();
+
     const id = document.getElementById('project-id').value;
     const projectData = {
       name: document.getElementById('project-name').value,
@@ -531,23 +644,28 @@ class UIController {
       status: document.getElementById('project-status').value
     };
 
-    if (id) {
-      this.dataManager.updateProject(id, projectData);
-    } else {
-      this.dataManager.createProject(projectData);
+    try {
+      if (id) {
+        await this.dataManager.updateProject(id, projectData);
+      } else {
+        await this.dataManager.createProject(projectData);
+      }
+      this.closeProjectModal();
+      this.refreshCurrentView();
+    } catch (error) {
+      alert('Error: ' + error.message);
     }
-
-    this.closeProjectModal();
-    this.refreshCurrentView();
   }
 
   editProject(id) {
+    if (!auth.isAdmin()) return this.openAuthModal();
     this.openProjectModal(id);
   }
 
-  deleteProject(id) {
+  async deleteProject(id) {
+    if (!auth.isAdmin()) return this.openAuthModal();
     if (confirm('¿Estás seguro de que quieres eliminar este proyecto? Se eliminarán todas sus tareas.')) {
-      this.dataManager.deleteProject(id);
+      await this.dataManager.deleteProject(id);
       this.refreshCurrentView();
     }
   }
@@ -584,8 +702,10 @@ class UIController {
     document.getElementById('task-modal').classList.add('hidden');
   }
 
-  handleTaskSubmit(e) {
+  async handleTaskSubmit(e) {
     e.preventDefault();
+    if (!auth.isAdmin()) return this.openAuthModal();
+
     const id = document.getElementById('task-id').value;
     const taskData = {
       title: document.getElementById('task-title').value,
@@ -595,17 +715,21 @@ class UIController {
       dueDate: document.getElementById('task-date').value
     };
 
-    if (id) {
-      this.dataManager.updateTask(id, taskData);
-    } else {
-      this.dataManager.createTask(taskData);
+    try {
+      if (id) {
+        await this.dataManager.updateTask(id, taskData);
+      } else {
+        await this.dataManager.createTask(taskData);
+      }
+      this.closeTaskModal();
+      this.refreshCurrentView();
+    } catch (error) {
+      alert('Error: ' + error.message);
     }
-
-    this.closeTaskModal();
-    this.refreshCurrentView();
   }
 
   editTask(id) {
+    if (!auth.isAdmin()) return this.openAuthModal();
     const task = this.dataManager.getTask(id);
     if (!task) return;
 
@@ -633,20 +757,63 @@ class UIController {
     modal.classList.remove('hidden');
   }
 
-  deleteTask(id) {
+  async deleteTask(id) {
+    if (!auth.isAdmin()) return this.openAuthModal();
     if (confirm('¿Estás seguro de que quieres eliminar esta tarea?')) {
-      this.dataManager.deleteTask(id);
+      await this.dataManager.deleteTask(id);
       this.refreshCurrentView();
     }
   }
 
-  toggleTaskStatus(id) {
+  async toggleTaskStatus(id) {
+    if (!auth.isAdmin()) return this.openAuthModal();
     const task = this.dataManager.getTask(id);
     if (!task) return;
 
     const newStatus = task.status === 'completed' ? 'pending' : 'completed';
-    this.dataManager.updateTask(id, { status: newStatus });
+    await this.dataManager.updateTask(id, { status: newStatus });
     this.refreshCurrentView();
+  }
+
+  // Auth Modal
+  openAuthModal() {
+    document.getElementById('auth-modal').classList.remove('hidden');
+  }
+
+  closeAuthModal() {
+    document.getElementById('auth-modal').classList.add('hidden');
+  }
+
+  switchAuthTab(tab) {
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+    document.getElementById('auth-submit-text').textContent = tab === 'login' ? 'Iniciar Sesión' : 'Registrarse';
+    this.currentAuthTab = tab;
+  }
+
+  async handleAuthSubmit(e) {
+    e.preventDefault();
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Procesando...';
+
+    try {
+      if (this.currentAuthTab === 'register') {
+        await auth.register(email, password);
+        alert('Registro exitoso. Revisa tu email para confirmar.');
+      } else {
+        await auth.login(email, password);
+      }
+      this.closeAuthModal();
+    } catch (error) {
+      alert('Error: ' + error.message);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = this.currentAuthTab === 'login' ? 'Iniciar Sesión' : 'Registrarse';
+    }
   }
 
   // Search and Filter
@@ -712,48 +879,5 @@ class UIController {
 // ===== INITIALIZE APP =====
 const dataManager = new DataManager();
 const ui = new UIController(dataManager);
-
-// Add some demo data if the app is empty
-if (dataManager.projects.length === 0) {
-  const demoProject1 = dataManager.createProject({
-    name: 'Proyecto de Ejemplo',
-    description: 'Este es un proyecto de demostración para que veas cómo funciona Area IA',
-    status: 'progress'
-  });
-
-  dataManager.createTask({
-    title: 'Crear diseño inicial',
-    description: 'Diseñar la interfaz de usuario',
-    projectId: demoProject1.id,
-    status: 'completed'
-  });
-
-  dataManager.createTask({
-    title: 'Implementar funcionalidades',
-    description: 'Desarrollar las características principales',
-    projectId: demoProject1.id,
-    status: 'progress'
-  });
-
-  dataManager.createTask({
-    title: 'Realizar pruebas',
-    description: 'Probar todas las funcionalidades',
-    projectId: demoProject1.id,
-    status: 'pending'
-  });
-
-  const demoProject2 = dataManager.createProject({
-    name: 'Documentación',
-    description: 'Crear la documentación del proyecto',
-    status: 'pending'
-  });
-
-  dataManager.createTask({
-    title: 'Escribir README',
-    description: 'Documentar cómo usar la aplicación',
-    projectId: demoProject2.id,
-    status: 'pending'
-  });
-
-  ui.refreshCurrentView();
-}
+const auth = new AuthController(ui);
+ui.auth = auth; // Referencia circular necesaria para control de UI

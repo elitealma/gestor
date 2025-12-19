@@ -1085,3 +1085,58 @@ body::before {
     min-width: auto;
   }
 }
+
+/* Auth Modal Specifics */
+.auth-modal {
+  max-width: 400px;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xl);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: var(--spacing-sm);
+}
+
+.auth-tab {
+  flex: 1;
+  padding: var(--spacing-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all var(--transition-base);
+  border-radius: var(--radius-md);
+}
+
+.auth-tab.active {
+  background: rgba(102, 126, 234, 0.1);
+  color: var(--accent-purple);
+}
+
+.auth-footer {
+  margin-top: var(--spacing-xl);
+  text-align: center;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.w-full {
+  width: 100%;
+  justify-content: center;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* User Role UI */
+.admin-only {
+  /* Controlado por JS */
+}
+
+.guest-mode .admin-only {
+  display: none !important;
+}

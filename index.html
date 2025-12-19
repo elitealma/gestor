@@ -15,6 +15,9 @@
 
   <!-- Styles -->
   <link rel="stylesheet" href="styles.css?v=1.0.2">
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
@@ -43,6 +46,14 @@
           <li class="nav-item" data-view="calendar">
             <span class="nav-icon">📅</span>
             <span>Calendario</span>
+          </li>
+          <li class="nav-item hidden" id="nav-logout">
+            <span class="nav-icon">🚪</span>
+            <span>Cerrar Sesión</span>
+          </li>
+          <li class="nav-item" id="nav-login">
+            <span class="nav-icon">🔐</span>
+            <span>Iniciar Sesión</span>
           </li>
         </ul>
       </nav>
@@ -290,6 +301,38 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Auth Modal -->
+  <div id="auth-modal" class="modal-overlay hidden">
+    <div class="modal auth-modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Acceso Area IA</h2>
+        <button class="modal-close" id="close-auth-modal">✕</button>
+      </div>
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">Ingresar</button>
+        <button class="auth-tab" data-tab="register">Registrarse</button>
+      </div>
+      <form id="auth-form">
+        <div class="form-group">
+          <label class="form-label" for="auth-email">Correo Electrónico</label>
+          <input type="email" id="auth-email" class="form-input" placeholder="tu@email.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="auth-password">Contraseña</label>
+          <input type="password" id="auth-password" class="form-input" placeholder="••••••••" required>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary w-full">
+            <span id="auth-submit-text">Iniciar Sesión</span>
+          </button>
+        </div>
+      </form>
+      <div class="auth-footer">
+        <p>Modo de solo lectura activado por defecto (Invitado)</p>
+      </div>
     </div>
   </div>
 
