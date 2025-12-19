@@ -196,7 +196,7 @@ class AuthController {
     clientSB.auth.onAuthStateChange(async (_event, session) => {
       this.user = session?.user || null;
       this.updateUIState();
-      await this.ui.dataManager.loadInitialData(); // Reload data on auth state change
+      await this.ui.dataManager.loadInitialData();
       this.ui.refreshCurrentView();
     });
   }
