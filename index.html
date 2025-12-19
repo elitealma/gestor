@@ -1,28 +1,31 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Gestor de proyectos moderno y premium para organizar tus proyectos y tareas">
-  <title>ProManager - Gestor de Proyectos</title>
-  
+  <title>Area IA - Gestión Inteligente de Proyectos</title>
+
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
   <!-- Styles -->
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
   <div class="app-container">
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="logo">
-        <span class="logo-icon">📊</span>
-        <span>ProManager</span>
+        <span class="logo-icon">🛸</span>
+        <span>Area IA</span>
       </div>
-      
+
       <nav>
         <ul class="nav-menu">
           <li class="nav-item active" data-view="dashboard">
@@ -37,6 +40,10 @@
             <span class="nav-icon">✓</span>
             <span>Tareas</span>
           </li>
+          <li class="nav-item" data-view="calendar">
+            <span class="nav-icon">📅</span>
+            <span>Calendario</span>
+          </li>
         </ul>
       </nav>
     </aside>
@@ -50,38 +57,51 @@
           <p class="content-subtitle">Resumen de tus proyectos y tareas</p>
         </div>
 
-        <!-- Stats Grid -->
-        <div class="stats-grid">
-          <div class="stat-card purple">
-            <div class="stat-header">
-              <span class="stat-icon">📁</span>
+        <!-- Today's Tasks & Stats Grid -->
+        <div class="dashboard-grid">
+          <div class="stats-grid">
+            <div class="stat-card purple">
+              <div class="stat-header">
+                <span class="stat-icon">📁</span>
+              </div>
+              <div class="stat-value" id="stat-total-projects">0</div>
+              <div class="stat-label">Proyectos Totales</div>
             </div>
-            <div class="stat-value" id="stat-total-projects">0</div>
-            <div class="stat-label">Proyectos Totales</div>
+
+            <div class="stat-card blue">
+              <div class="stat-header">
+                <span class="stat-icon">🚀</span>
+              </div>
+              <div class="stat-value" id="stat-active-projects">0</div>
+              <div class="stat-label">Proyectos Activos</div>
+            </div>
+
+            <div class="stat-card green">
+              <div class="stat-header">
+                <span class="stat-icon">✓</span>
+              </div>
+              <div class="stat-value" id="stat-completed-tasks">0</div>
+              <div class="stat-label">Tareas Completadas</div>
+            </div>
+
+            <div class="stat-card pink">
+              <div class="stat-header">
+                <span class="stat-icon">⏱️</span>
+              </div>
+              <div class="stat-value" id="stat-pending-tasks">0</div>
+              <div class="stat-label">Tareas Pendientes</div>
+            </div>
           </div>
 
-          <div class="stat-card blue">
-            <div class="stat-header">
-              <span class="stat-icon">🚀</span>
+          <!-- Today's Tasks Section -->
+          <div class="today-tasks-container">
+            <div class="card-header">
+              <h2 class="card-title">Tareas de Hoy</h2>
+              <span class="date-badge" id="current-date-badge"></span>
             </div>
-            <div class="stat-value" id="stat-active-projects">0</div>
-            <div class="stat-label">Proyectos Activos</div>
-          </div>
-
-          <div class="stat-card green">
-            <div class="stat-header">
-              <span class="stat-icon">✓</span>
+            <div id="today-tasks-list" class="tasks-list minimal">
+              <div class="empty-state">No hay tareas para hoy</div>
             </div>
-            <div class="stat-value" id="stat-completed-tasks">0</div>
-            <div class="stat-label">Tareas Completadas</div>
-          </div>
-
-          <div class="stat-card pink">
-            <div class="stat-header">
-              <span class="stat-icon">⏱️</span>
-            </div>
-            <div class="stat-value" id="stat-pending-tasks">0</div>
-            <div class="stat-label">Tareas Pendientes</div>
           </div>
         </div>
 
@@ -149,6 +169,35 @@
         <!-- Tasks List -->
         <div id="tasks-list" class="tasks-list"></div>
       </section>
+
+      <!-- Calendar View -->
+      <section id="calendar-view" class="view hidden">
+        <div class="content-header">
+          <h1 class="content-title">Calendario</h1>
+          <p class="content-subtitle">Visualiza tus tareas por fecha</p>
+        </div>
+
+        <div class="calendar-container card">
+          <div class="calendar-header">
+            <h2 id="calendar-month-year">Diciembre 2025</h2>
+            <div class="calendar-nav">
+              <button class="btn btn-icon" id="prev-month">❮</button>
+              <button class="btn btn-secondary" id="today-btn">Hoy</button>
+              <button class="btn btn-icon" id="next-month">❯</button>
+            </div>
+          </div>
+          <div class="calendar-weekdays">
+            <div>Dom</div>
+            <div>Lun</div>
+            <div>Mar</div>
+            <div>Mié</div>
+            <div>Jue</div>
+            <div>Vie</div>
+            <div>Sáb</div>
+          </div>
+          <div id="calendar-grid" class="calendar-grid"></div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -161,7 +210,7 @@
       </div>
       <form id="project-form">
         <input type="hidden" id="project-id">
-        
+
         <div class="form-group">
           <label class="form-label" for="project-name">Nombre del Proyecto</label>
           <input type="text" id="project-name" class="form-input" placeholder="Ej: Desarrollo Web" required>
@@ -169,7 +218,8 @@
 
         <div class="form-group">
           <label class="form-label" for="project-description">Descripción</label>
-          <textarea id="project-description" class="form-textarea" placeholder="Describe tu proyecto..." required></textarea>
+          <textarea id="project-description" class="form-textarea" placeholder="Describe tu proyecto..."
+            required></textarea>
         </div>
 
         <div class="form-group">
@@ -201,7 +251,7 @@
       <form id="task-form">
         <input type="hidden" id="task-id">
         <input type="hidden" id="task-project-id">
-        
+
         <div class="form-group">
           <label class="form-label" for="task-title">Título de la Tarea</label>
           <input type="text" id="task-title" class="form-input" placeholder="Ej: Diseñar interfaz" required>
@@ -217,6 +267,11 @@
           <select id="task-project" class="form-select" required>
             <option value="">Selecciona un proyecto</option>
           </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="task-date">Fecha de Vencimiento</label>
+          <input type="date" id="task-date" class="form-input" required>
         </div>
 
         <div class="form-group">
@@ -241,4 +296,5 @@
   <!-- JavaScript -->
   <script src="app.js"></script>
 </body>
+
 </html>

@@ -73,6 +73,7 @@ class DataManager {
       description: taskData.description,
       projectId: taskData.projectId,
       status: taskData.status,
+      dueDate: taskData.dueDate || new Date().toISOString().split('T')[0], // YYYY-MM-DD
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -124,6 +125,15 @@ class DataManager {
     const completed = tasks.filter(t => t.status === 'completed').length;
     return Math.round((completed / tasks.length) * 100);
   }
+
+  getTodayTasks() {
+    const today = new Date().toISOString().split('T')[0];
+    return this.tasks.filter(task => task.dueDate === today);
+  }
+
+  getTasksByDate(date) {
+    return this.tasks.filter(task => task.dueDate === date);
+  }
 }
 
 // ===== UI CONTROLLER =====
@@ -134,6 +144,7 @@ class UIController {
   }
 
   init() {
+    this.currentDate = new Date();
     this.setupEventListeners();
     this.renderDashboard();
     this.updateStats();
@@ -164,6 +175,14 @@ class UIController {
     document.getElementById('filter-projects').addEventListener('change', (e) => this.handleFilterProjects(e));
     document.getElementById('search-tasks').addEventListener('input', (e) => this.handleSearchTasks(e));
     document.getElementById('filter-tasks').addEventListener('change', (e) => this.handleFilterTasks(e));
+
+    // Calendar Nav
+    document.getElementById('prev-month').addEventListener('click', () => this.changeMonth(-1));
+    document.getElementById('next-month').addEventListener('click', () => this.changeMonth(1));
+    document.getElementById('today-btn').addEventListener('click', () => {
+      this.currentDate = new Date();
+      this.renderCalendar();
+    });
 
     // Close modals on overlay click
     document.getElementById('project-modal').addEventListener('click', (e) => {
@@ -196,12 +215,20 @@ class UIController {
       this.renderProjects();
     } else if (view === 'tasks') {
       this.renderTasks();
+    } else if (view === 'calendar') {
+      this.renderCalendar();
     }
     this.updateStats();
   }
 
   // Dashboard Rendering
   renderDashboard() {
+    this.renderRecentProjects();
+    this.renderTodayTasks();
+    this.updateCurrentDateBadge();
+  }
+
+  renderRecentProjects() {
     const recentProjects = this.dataManager.projects.slice(-3).reverse();
     const container = document.getElementById('recent-projects');
 
@@ -222,6 +249,31 @@ class UIController {
     container.innerHTML = recentProjects.map(project => this.renderProjectCard(project)).join('');
   }
 
+  renderTodayTasks() {
+    const todayTasks = this.dataManager.getTodayTasks();
+    const container = document.getElementById('today-tasks-list');
+
+    if (todayTasks.length === 0) {
+      container.innerHTML = '<div class="empty-state">No hay tareas para hoy</div>';
+      return;
+    }
+
+    container.innerHTML = todayTasks.map(task => `
+      <div class="task-item" onclick="ui.editTask('${task.id}')" style="cursor: pointer;">
+        <div class="task-checkbox ${task.status === 'completed' ? 'checked' : ''}" 
+             onclick="event.stopPropagation(); ui.toggleTaskStatus('${task.id}')"></div>
+        <div class="task-content">
+          <div class="task-title ${task.status === 'completed' ? 'completed' : ''}">${this.escapeHtml(task.title)}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  updateCurrentDateBadge() {
+    const options = { weekday: 'long', day: 'numeric', month: 'long' };
+    document.getElementById('current-date-badge').textContent = new Date().toLocaleDateString('es-ES', options);
+  }
+
   // Projects Rendering
   renderProjects(filter = 'all', search = '') {
     let projects = this.dataManager.projects;
@@ -233,7 +285,7 @@ class UIController {
 
     // Apply search
     if (search) {
-      projects = projects.filter(p => 
+      projects = projects.filter(p =>
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.description.toLowerCase().includes(search.toLowerCase())
       );
@@ -315,7 +367,7 @@ class UIController {
 
     // Apply search
     if (search) {
-      tasks = tasks.filter(t => 
+      tasks = tasks.filter(t =>
         t.title.toLowerCase().includes(search.toLowerCase()) ||
         t.description.toLowerCase().includes(search.toLowerCase())
       );
@@ -348,6 +400,7 @@ class UIController {
           <div class="task-title ${isCompleted ? 'completed' : ''}">${this.escapeHtml(task.title)}</div>
           <div class="task-meta">
             <span>📁 ${project ? this.escapeHtml(project.name) : 'Sin proyecto'}</span>
+            <span>📅 ${task.dueDate}</span>
             ${statusBadge}
           </div>
         </div>
@@ -361,6 +414,71 @@ class UIController {
         </div>
       </div>
     `;
+  }
+
+  // Calendar Rendering
+  renderCalendar() {
+    const year = this.currentDate.getFullYear();
+    const month = this.currentDate.getMonth();
+
+    const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+    document.getElementById('calendar-month-year').textContent = `${monthNames[month]} ${year}`;
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    const grid = document.getElementById('calendar-grid');
+    grid.innerHTML = '';
+
+    // Previous month days
+    for (let i = firstDay; i > 0; i--) {
+      const day = daysInPrevMonth - i + 1;
+      grid.appendChild(this.createCalendarDay(day, month - 1, year, true));
+    }
+
+    // Current month days
+    for (let i = 1; i <= daysInMonth; i++) {
+      grid.appendChild(this.createCalendarDay(i, month, year));
+    }
+
+    // Next month days
+    const totalDays = grid.children.length;
+    for (let i = 1; i <= (42 - totalDays); i++) {
+      grid.appendChild(this.createCalendarDay(i, month + 1, year, true));
+    }
+  }
+
+  createCalendarDay(day, month, year, isOtherMonth = false) {
+    const date = new Date(year, month, day);
+    const dateStr = date.toISOString().split('T')[0];
+    const tasks = this.dataManager.getTasksByDate(dateStr);
+    const isToday = dateStr === new Date().toISOString().split('T')[0];
+
+    const dayEl = document.createElement('div');
+    dayEl.className = `calendar-day ${isOtherMonth ? 'other-month' : ''} ${isToday ? 'today' : ''}`;
+    dayEl.onclick = () => this.openTaskModalForDate(dateStr);
+
+    dayEl.innerHTML = `
+      <div class="day-number">${day}</div>
+      <div class="day-tasks">
+        ${tasks.map(t => `<div class="calendar-task-dot ${t.status === 'completed' ? 'completed' : ''}">${this.escapeHtml(t.title)}</div>`).join('')}
+      </div>
+    `;
+
+    return dayEl;
+  }
+
+  changeMonth(delta) {
+    this.currentDate.setMonth(this.currentDate.getMonth() + delta);
+    this.renderCalendar();
+  }
+
+  openTaskModalForDate(date) {
+    this.openTaskModal();
+    document.getElementById('task-date').value = date;
   }
 
   // Statistics
@@ -446,11 +564,12 @@ class UIController {
 
     // Populate project select
     projectSelect.innerHTML = '<option value="">Selecciona un proyecto</option>' +
-      this.dataManager.projects.map(p => 
+      this.dataManager.projects.map(p =>
         `<option value="${p.id}" ${projectId === p.id ? 'selected' : ''}>${this.escapeHtml(p.name)}</option>`
       ).join('');
 
     document.getElementById('task-id').value = '';
+    document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
     if (projectId) {
       document.getElementById('task-project-id').value = projectId;
       projectSelect.value = projectId;
@@ -472,7 +591,8 @@ class UIController {
       title: document.getElementById('task-title').value,
       description: document.getElementById('task-description').value,
       projectId: document.getElementById('task-project').value,
-      status: document.getElementById('task-status').value
+      status: document.getElementById('task-status').value,
+      dueDate: document.getElementById('task-date').value
     };
 
     if (id) {
@@ -496,7 +616,7 @@ class UIController {
 
     // Populate project select
     projectSelect.innerHTML = '<option value="">Selecciona un proyecto</option>' +
-      this.dataManager.projects.map(p => 
+      this.dataManager.projects.map(p =>
         `<option value="${p.id}">${this.escapeHtml(p.name)}</option>`
       ).join('');
 
@@ -504,6 +624,7 @@ class UIController {
     document.getElementById('task-title').value = task.title;
     document.getElementById('task-description').value = task.description || '';
     document.getElementById('task-project').value = task.projectId;
+    document.getElementById('task-date').value = task.dueDate;
     document.getElementById('task-status').value = task.status;
 
     title.textContent = 'Editar Tarea';
@@ -566,6 +687,8 @@ class UIController {
       const filter = document.getElementById('filter-tasks').value;
       const search = document.getElementById('search-tasks').value;
       this.renderTasks(filter, search);
+    } else if (view === 'calendar') {
+      this.renderCalendar();
     }
     this.updateStats();
   }
@@ -594,7 +717,7 @@ const ui = new UIController(dataManager);
 if (dataManager.projects.length === 0) {
   const demoProject1 = dataManager.createProject({
     name: 'Proyecto de Ejemplo',
-    description: 'Este es un proyecto de demostración para que veas cómo funciona ProManager',
+    description: 'Este es un proyecto de demostración para que veas cómo funciona Area IA',
     status: 'progress'
   });
 
