@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   promanager:
-    build: .
+    image: elitealma/promanager:latest
     networks:
       - pegasus_net
     deploy:
