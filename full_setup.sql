@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- SCRIPT MAESTRO DE CONFIGURACIÓN (Area IA) - v1.0
+-- SCRIPT MAESTRO DE CONFIGURACIÓN (Area IA) - v1.1 (FIXED)
 -- -----------------------------------------------------------------------------
 -- Este script hace TODO lo necesario para dejar la base de datos perfecta.
 -- 1. Arregla columnas faltantes (Schema).
@@ -29,8 +29,9 @@ DECLARE
 BEGIN
     SELECT id INTO v_user_id FROM auth.users WHERE email = 'elitealmaia@gmail.com';
     IF v_user_id IS NOT NULL THEN
-        INSERT INTO public.profiles (id, email, role)
-        VALUES (v_user_id, 'elitealmaia@gmail.com', 'super_admin')
+        -- FIX: Added 'username' to satisfy NOT NULL constraint
+        INSERT INTO public.profiles (id, email, role, username)
+        VALUES (v_user_id, 'elitealmaia@gmail.com', 'super_admin', 'EliteAdmin')
         ON CONFLICT (id) DO UPDATE SET role = 'super_admin';
     END IF;
 END $$;
