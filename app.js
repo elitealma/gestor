@@ -233,7 +233,7 @@ class AuthController {
   constructor(uiController) {
     this.ui = uiController;
     this.user = null;
-    this.init();
+    // Removed automatic init() to prevent race conditions
   }
 
   async init() {
@@ -303,7 +303,7 @@ class UIController {
   constructor(dataManager) {
     this.dataManager = dataManager;
     this.currentAuthTab = 'login';
-    this.init();
+    // Removed automatic init() to prevent race conditions
   }
 
   init() {
@@ -1018,4 +1018,10 @@ class UIController {
 const dataManager = new DataManager();
 const ui = new UIController(dataManager);
 const auth = new AuthController(ui);
-ui.auth = auth; // Referencia circular necesaria para control de UI
+ui.auth = auth;
+
+// Safe Initialization Sequence
+(async () => {
+  await auth.init(); // Load session first
+  ui.init();         // Then load UI and listeners
+})();
