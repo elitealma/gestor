@@ -48,11 +48,13 @@ class DataManager {
       let projectsQuery = clientSB.from('projects').select('*').order('created_at', { ascending: false });
       let tasksQuery = clientSB.from('tasks').select('*').order('created_at', { ascending: false });
 
-      // Partition by area if not super_admin (and profile exists)
+      /* 
+      // Removed filtering to allow Guests to see ALL info (Read Only)
       if (this.profile && this.profile.role !== 'super_admin') {
         projectsQuery = projectsQuery.eq('area_id', this.profile.area_id);
         tasksQuery = tasksQuery.eq('area_id', this.profile.area_id);
       }
+      */
 
       const [{ data: projects }, { data: tasks }] = await Promise.all([
         projectsQuery,
@@ -280,6 +282,7 @@ class AuthController {
     document.body.classList.toggle('guest-mode', !this.user);
     document.getElementById('nav-login').classList.toggle('hidden', !!this.user);
     document.getElementById('nav-logout').classList.toggle('hidden', !this.user);
+    document.getElementById('nav-settings').classList.toggle('hidden', !this.user); // Hide Settings if guest
 
     // Multi-tenant visibility
     document.getElementById('nav-management').classList.toggle('hidden', !isSuperAdmin);
