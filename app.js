@@ -7,15 +7,56 @@ class DataManager {
   constructor() {
     this.projects = [];
     this.tasks = [];
+    this.areas = [];
+    this.profile = null;
     this.currentView = 'dashboard';
   }
 
   // Supabase Data Fetching
   async loadInitialData() {
     try {
+      if (!auth.user) return false;
+
+      // Fetch Profile
+      let { data: profile } = await clientSB
+        .from('profiles')
+        .select('*, areas(*)')
+        .eq('id', auth.user.id)
+        .maybeSingle();
+
+      // JIT Profile Creation if missing (Fallback for trigger failures)
+      if (!profile && auth.user) {
+        const { data: newProfile, error: insertError } = await clientSB
+          .from('profiles')
+          .insert([{
+            id: auth.user.id,
+            email: auth.user.email,
+            role: auth.user.email === 'elitealmaia@gmail.com' ? 'super_admin' : 'user'
+          }])
+          .select('*, areas(*)')
+          .maybeSingle();
+
+        if (!insertError) {
+          profile = newProfile;
+        } else {
+          console.error('Error creating JIT profile:', insertError);
+        }
+      }
+
+      this.profile = profile;
+
+      let projectsQuery = clientSB.from('projects').select('*').order('created_at', { ascending: false });
+      let tasksQuery = clientSB.from('tasks').select('*').order('created_at', { ascending: false });
+
+      // Partition by area if not super_admin (and profile exists)
+      if (this.profile && this.profile.role !== 'super_admin') {
+        projectsQuery = projectsQuery.eq('area_id', this.profile.area_id);
+        tasksQuery = tasksQuery.eq('area_id', this.profile.area_id);
+      }
+
       const [{ data: projects }, { data: tasks }] = await Promise.all([
-        clientSB.from('projects').select('*').order('created_at', { ascending: false }),
-        clientSB.from('tasks').select('*').order('created_at', { ascending: false })
+        projectsQuery,
+        tasksQuery
       ]);
 
       this.projects = (projects || []).map(p => ({
@@ -32,6 +73,11 @@ class DataManager {
         updatedAt: t.updated_at
       }));
 
+      if (this.profile && this.profile.role === 'super_admin') {
+        const { data: areas } = await clientSB.from('areas').select('*');
+        this.areas = areas || [];
+      }
+
       return true;
     } catch (error) {
       console.error('Error cargando datos de Supabase:', error);
@@ -41,12 +87,13 @@ class DataManager {
 
   // Project CRUD
   async createProject(projectData) {
-    const { data, error } = await supabase
+    const { data, error } = await clientSB
       .from('projects')
       .insert([{
         name: projectData.name,
         description: projectData.description,
-        status: projectData.status
+        status: projectData.status,
+        area_id: this.profile?.area_id || null
       }])
       .select();
 
@@ -57,7 +104,7 @@ class DataManager {
   }
 
   async updateProject(id, projectData) {
-    const { data, error } = await supabase
+    const { data, error } = await clientSB
       .from('projects')
       .update({
         name: projectData.name,
@@ -88,14 +135,15 @@ class DataManager {
 
   // Task CRUD
   async createTask(taskData) {
-    const { data, error } = await supabase
+    const { data, error } = await clientSB
       .from('tasks')
       .insert([{
         title: taskData.title,
         description: taskData.description,
         project_id: taskData.projectId,
         status: taskData.status,
-        due_date: taskData.dueDate || new Date().toISOString().split('T')[0]
+        due_date: taskData.dueDate || new Date().toISOString().split('T')[0],
+        area_id: this.profile?.area_id || null
       }])
       .select();
 
@@ -120,7 +168,7 @@ class DataManager {
     if (taskData.dueDate) updatePayload.due_date = taskData.dueDate;
     updatePayload.updated_at = new Date().toISOString();
 
-    const { data, error } = await supabase
+    const { data, error } = await clientSB
       .from('tasks')
       .update(updatePayload)
       .eq('id', id)
@@ -216,18 +264,35 @@ class AuthController {
   }
 
   isAdmin() {
-    return !!this.user;
+    return this.ui.dataManager.profile?.role === 'super_admin';
+  }
+
+  isAreaLeader() {
+    return this.ui.dataManager.profile?.role === 'area_leader';
   }
 
   updateUIState() {
-    const isAdmin = this.isAdmin();
-    document.body.classList.toggle('guest-mode', !isAdmin);
-    document.getElementById('nav-login').classList.toggle('hidden', isAdmin);
-    document.getElementById('nav-logout').classList.toggle('hidden', !isAdmin);
+    const profile = this.ui.dataManager.profile;
+    const isSuperAdmin = this.isAdmin();
+    const isAreaLeader = this.isAreaLeader();
+    const canEdit = isSuperAdmin || isAreaLeader;
 
-    // Hide/show admin actions
+    document.body.classList.toggle('guest-mode', !this.user);
+    document.getElementById('nav-login').classList.toggle('hidden', !!this.user);
+    document.getElementById('nav-logout').classList.toggle('hidden', !this.user);
+
+    // Multi-tenant visibility
+    document.getElementById('nav-management').classList.toggle('hidden', !isSuperAdmin);
+    document.getElementById('nav-team').classList.toggle('hidden', !isAreaLeader);
+
+    // Sidebar text update
+    const areaName = profile?.areas?.name || 'Invitado';
+    const roleLabel = isSuperAdmin ? 'Super Admin' : (profile ? areaName : 'Invitado');
+    document.getElementById('user-area-tag').textContent = roleLabel;
+
+    // Control visibility of admin actions
     document.querySelectorAll('.admin-only').forEach(el => {
-      el.classList.toggle('hidden', !isAdmin);
+      el.classList.toggle('hidden', !canEdit);
     });
   }
 }
@@ -237,6 +302,7 @@ class AuthController {
 class UIController {
   constructor(dataManager) {
     this.dataManager = dataManager;
+    this.currentAuthTab = 'login';
     this.init();
   }
 
@@ -256,6 +322,8 @@ class UIController {
         if (view) this.switchView(view);
       });
     });
+
+    document.getElementById('nav-settings').addEventListener('click', () => this.switchView('settings'));
 
     document.getElementById('nav-logout').addEventListener('click', () => auth.logout());
     document.getElementById('nav-login').addEventListener('click', () => this.openAuthModal());
@@ -777,6 +845,7 @@ class UIController {
 
   // Auth Modal
   openAuthModal() {
+    this.switchAuthTab('login');
     document.getElementById('auth-modal').classList.remove('hidden');
   }
 
@@ -803,7 +872,9 @@ class UIController {
     try {
       if (this.currentAuthTab === 'register') {
         await auth.register(email, password);
-        alert('Registro exitoso. Revisa tu email para confirmar.');
+        alert('Registro exitoso. Ya puedes iniciar sesión.');
+        this.closeAuthModal();
+        return; // Stop here for registration
       } else {
         await auth.login(email, password);
       }
@@ -858,6 +929,73 @@ class UIController {
       this.renderCalendar();
     }
     this.updateStats();
+  }
+
+  // Management (Super Admin)
+  renderManagement() {
+    const container = document.getElementById('areas-list');
+    const areas = this.dataManager.areas;
+
+    if (areas.length === 0) {
+      container.innerHTML = '<div class="empty-state">No hay áreas creadas</div>';
+      return;
+    }
+
+    container.innerHTML = areas.map(area => `
+      <div class="project-card">
+        <div class="project-header">
+          <h3 class="project-title">${this.escapeHtml(area.name)}</h3>
+          <div class="project-actions">
+            <button class="btn-icon btn-secondary" onclick="ui.editArea('${area.id}')">✏️</button>
+          </div>
+        </div>
+        <div class="project-meta">
+          <div class="project-stat">
+            <span>📅</span>
+            <span>Creada: ${new Date(area.created_at).toLocaleDateString()}</span>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Team (Area Leader)
+  async renderTeam() {
+    const container = document.getElementById('team-list');
+    const areaId = this.dataManager.profile?.area_id;
+
+    if (!areaId) {
+      container.innerHTML = '<div class="empty-state">No tienes un área asignada</div>';
+      return;
+    }
+
+    const { data: members } = await clientSB
+      .from('profiles')
+      .select('*')
+      .eq('area_id', areaId);
+
+    if (!members || members.length === 0) {
+      container.innerHTML = '<div class="empty-state">No hay miembros en tu equipo</div>';
+      return;
+    }
+
+    container.innerHTML = members.map(member => `
+      <div class="task-item">
+        <div class="task-content">
+          <div class="task-title">${this.escapeHtml(member.email)}</div>
+          <div class="task-meta">
+            <span>Rol: ${member.role}</span>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Settings
+  renderSettings() {
+    if (this.dataManager.profile) {
+      document.getElementById('settings-email').value = this.dataManager.profile.email;
+    }
   }
 
   getStatusBadge(status) {

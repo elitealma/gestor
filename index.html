@@ -14,7 +14,7 @@
     rel="stylesheet">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="styles.css?v=1.0.4">
+  <link rel="stylesheet" href="styles.css?v=1.0.6">
 
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -26,7 +26,10 @@
     <aside class="sidebar">
       <div class="logo">
         <span class="logo-icon">🛸</span>
-        <span>Area IA</span>
+        <div class="logo-text">
+          <span>Area IA</span>
+          <span id="user-area-tag" class="area-badge">Invitado</span>
+        </div>
       </div>
 
       <nav>
@@ -47,6 +50,22 @@
             <span class="nav-icon">📅</span>
             <span>Calendario</span>
           </li>
+
+          <li class="nav-divider"></li>
+
+          <li class="nav-item hidden" id="nav-management" data-view="management">
+            <span class="nav-icon">🏗️</span>
+            <span>Gestión</span>
+          </li>
+          <li class="nav-item hidden" id="nav-team" data-view="team">
+            <span class="nav-icon">👥</span>
+            <span>Equipo</span>
+          </li>
+          <li class="nav-item" id="nav-settings" data-view="settings">
+            <span class="nav-icon">⚙️</span>
+            <span>Ajustes</span>
+          </li>
+
           <li class="nav-item hidden" id="nav-logout">
             <span class="nav-icon">🚪</span>
             <span>Cerrar Sesión</span>
@@ -209,6 +228,63 @@
           <div id="calendar-grid" class="calendar-grid"></div>
         </div>
       </section>
+
+      <!-- Management View (Super Admin Only) -->
+      <section id="management-view" class="view hidden">
+        <div class="content-header">
+          <h1 class="content-title">Gestión de Áreas</h1>
+          <p class="content-subtitle">Administra las áreas del sistema y asigna líderes</p>
+        </div>
+        <div class="toolbar">
+          <button class="btn btn-primary" id="btn-new-area">
+            <span>🏗️</span>
+            <span>Nueva Área</span>
+          </button>
+        </div>
+        <div id="areas-list" class="projects-grid">
+          <!-- Areas will be rendered here -->
+        </div>
+      </section>
+
+      <!-- Team View (Area Leader Only) -->
+      <section id="team-view" class="view hidden">
+        <div class="content-header">
+          <h1 class="content-title">Mi Equipo</h1>
+          <p class="content-subtitle">Gestiona los usuarios de tu área</p>
+        </div>
+        <div class="toolbar">
+          <button class="btn btn-primary" id="btn-add-member">
+            <span>👥</span>
+            <span>Agregar Miembro</span>
+          </button>
+        </div>
+        <div id="team-list" class="tasks-list">
+          <!-- Team members will be rendered here -->
+        </div>
+      </section>
+
+      <!-- Settings View -->
+      <section id="settings-view" class="view hidden">
+        <div class="content-header">
+          <h1 class="content-title">Ajustes de Perfil</h1>
+          <p class="content-subtitle">Gestiona tu información personal y seguridad</p>
+        </div>
+        <div class="settings-container card">
+          <form id="settings-form">
+            <div class="form-group">
+              <label class="form-label">Email Actual</label>
+              <input type="email" id="settings-email" class="form-input" readonly>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nueva Contraseña</label>
+              <input type="password" id="settings-new-password" class="form-input" placeholder="••••••••">
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+            </div>
+          </form>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -337,8 +413,7 @@
   </div>
 
   <!-- JavaScript -->
-  <script src="app.js?v=1.0.4"></script>
-  </script>
+  <script src="app.js?v=1.0.6"></script>
 </body>
 
 </html>

@@ -1140,3 +1140,36 @@ body::before {
 .guest-mode .admin-only {
   display: none !important;
 }
+
+/* Hierarchy & Profile Styles */
+.logo-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.area-badge {
+  font-size: var(--font-size-xs);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-weight: 500;
+  width: fit-content;
+  margin-top: 2px;
+}
+
+.nav-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: var(--spacing-md) var(--spacing-lg);
+  opacity: 0.5;
+}
+
+.settings-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.tasks-list.minimal .task-item {
+  padding: var(--spacing-sm) var(--spacing-md);
+}
