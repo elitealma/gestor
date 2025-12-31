@@ -422,8 +422,9 @@ class AuthController {
   }
 
   async requestPasswordReset(email) {
+    const domain = 'https://gestor.pegasus360agency.com/';
     const { error } = await clientSB.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+      redirectTo: domain,
     });
     if (error) throw error;
   }
