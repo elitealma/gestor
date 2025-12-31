@@ -670,6 +670,17 @@ class UIController {
     document.getElementById('project-modal').addEventListener('click', (e) => {
       if (e.target.id === 'project-modal') this.closeProjectModal();
     });
+
+    // User Details Modal Handlers
+    document.getElementById('close-user-details')?.addEventListener('click', () => {
+      document.getElementById('user-details-modal')?.classList.add('hidden');
+    });
+    document.getElementById('btn-close-user-details')?.addEventListener('click', () => {
+      document.getElementById('user-details-modal')?.classList.add('hidden');
+    });
+    document.getElementById('user-details-modal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'user-details-modal') e.target.classList.add('hidden');
+    });
     document.getElementById('task-modal').addEventListener('click', (e) => {
       if (e.target.id === 'task-modal') this.closeTaskModal();
     });
@@ -1612,6 +1623,7 @@ ui.renderUsersView = async function () {
           </div>
         </div>
         <div class="task-actions admin-only">
+          <button class="btn-icon btn-secondary" onclick="ui.viewUserDetails('${user.id}')" title="Ver proyectos y tareas">👁️</button>
           <button class="btn-icon btn-secondary" onclick="ui.editUser('${user.id}')" title="Editar usuario">✏️</button>
         </div>
       </div>
@@ -1770,6 +1782,81 @@ ui.openCreateUserModal = function () {
   }
 
   modal?.classList.remove('hidden');
+};
+
+// View User Details (Tasks & Projects)
+ui.viewUserDetails = async function (userId) {
+  const modal = document.getElementById('user-details-modal');
+  const infoContainer = document.getElementById('user-details-info');
+  const projectsContainer = document.getElementById('user-details-projects');
+  const tasksContainer = document.getElementById('user-details-tasks');
+
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  infoContainer.innerHTML = '<div class="empty-state">Cargando detalles...</div>';
+  projectsContainer.innerHTML = '';
+  tasksContainer.innerHTML = '';
+
+  try {
+    // 1. Fetch user profile
+    const { data: user, error: userError } = await clientSB
+      .from('profiles')
+      .select('*, areas(name)')
+      .eq('id', userId)
+      .single();
+
+    if (userError) throw userError;
+
+    // 2. Fetch tasks assigned to this user
+    const { data: tasks, error: tasksError } = await clientSB
+      .from('tasks')
+      .select('*, projects(name)')
+      .eq('assigned_to', userId)
+      .order('created_at', { ascending: false });
+
+    if (tasksError) throw tasksError;
+
+    // Render Info
+    infoContainer.innerHTML = `
+      <div class="card bg-surface-variant p-md">
+        <h2 class="card-title mb-xs">${this.escapeHtml(user.username || user.email)}</h2>
+        <p class="text-sm opacity-70 mb-sm">${user.email}</p>
+        <div class="flex gap-sm">
+          <span class="badge badge-progress">${user.role}</span>
+          ${user.areas ? `<span class="badge badge-pending">${this.escapeHtml(user.areas.name)}</span>` : ''}
+        </div>
+      </div>
+    `;
+
+    // Render Tasks & Projects
+    if (!tasks || tasks.length === 0) {
+      tasksContainer.innerHTML = '<div class="empty-state">No tiene tareas asignadas</div>';
+      projectsContainer.innerHTML = '<div class="empty-state">No participa en proyectos</div>';
+    } else {
+      // Group unique projects
+      const uniqueProjects = Array.from(new Set(tasks.map(t => t.projects?.name).filter(Boolean)));
+      projectsContainer.innerHTML = uniqueProjects.map(p => `
+        <div class="card p-sm border-accent">
+          <div class="font-bold">📁 ${this.escapeHtml(p)}</div>
+        </div>
+      `).join('');
+
+      tasksContainer.innerHTML = tasks.map(t => `
+        <div class="task-item" style="padding: 10px; margin-bottom: 5px; border-left: 3px solid var(--accent-color);">
+          <div class="flex justify-between items-center w-full">
+            <div>
+              <div class="font-bold text-sm">${this.escapeHtml(t.title)}</div>
+              <div class="text-xs opacity-60">${t.projects?.name || 'Sin proyecto'}</div>
+            </div>
+            ${this.getStatusBadge(t.status)}
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (error) {
+    console.error('Error viewing user details:', error);
+    infoContainer.innerHTML = '<div class="empty-state text-error">Error al cargar datos: ' + error.message + '</div>';
+  }
 };
 
 // Edit User Helper

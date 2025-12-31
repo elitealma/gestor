@@ -571,6 +571,38 @@
     </div>
   </div>
 
+  <!-- User Details Modal -->
+  <div id="user-details-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="user-details-title">Detalles del Usuario</h2>
+        <button class="modal-close" id="close-user-details"></button>
+      </div>
+      <div class="modal-body overflow-y-auto" style="max-height: 70vh;">
+        <div id="user-details-info" class="mb-lg">
+          <!-- User info will be injected here -->
+        </div>
+
+        <div class="mb-lg">
+          <h3 class="card-title mb-sm">Proyectos Activos</h3>
+          <div id="user-details-projects" class="grid grid-cols-1 gap-sm">
+            <!-- Projects list -->
+          </div>
+        </div>
+
+        <div>
+          <h3 class="card-title mb-sm">Tareas Asignadas</h3>
+          <div id="user-details-tasks" class="grid grid-cols-1 gap-sm">
+            <!-- Tasks list -->
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer mt-lg">
+        <button type="button" class="btn btn-secondary w-full" id="btn-close-user-details">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- JavaScript -->
   <script src="app.js?v=1.1.0"></script>
 </body>
