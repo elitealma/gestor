@@ -86,7 +86,7 @@ DROP POLICY IF EXISTS "Profiles Update Self" ON profiles;
 -- C. Crear Políticas Nuevas (Sistema Multi-Rol)
 
 -- PROJECTS
--- Lectura: Todos pueden ver proyectos
+-- Lectura: Todos pueden ver proyectos (Incluyendo el nuevo rol admin global)
 CREATE POLICY "Projects Read All" ON projects FOR SELECT 
 USING (auth.role() IN ('anon', 'authenticated'));
 
@@ -177,6 +177,9 @@ CREATE POLICY "Areas Write Admin" ON areas FOR ALL USING (
 -- PROFILES
 CREATE POLICY "Profiles Read All" ON profiles FOR SELECT USING (true);
 CREATE POLICY "Profiles Update Self" ON profiles FOR UPDATE USING (auth.uid() = id);
+
+-- NOTA: El rol 'admin' (global viewer) no tiene políticas de escritura (FOR ALL, INSERT, UPDATE, DELETE),
+-- por lo cual heredará solo el acceso de lectura definido en "Read All".
 
 -- =============================================================================
 -- 3. DATOS DE DEMO (Proyectos de Automatización)

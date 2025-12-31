@@ -53,17 +53,17 @@
 
           <li class="nav-divider"></li>
 
-          <li class="nav-item hidden" id="nav-management" data-view="management">
+          <li class="nav-item hidden" id="nav-areas" data-view="areas">
             <span class="nav-icon">🏗️</span>
-            <span>Gestión</span>
+            <span>Áreas</span>
           </li>
-          <li class="nav-item hidden" id="nav-team" data-view="team">
+          <li class="nav-item hidden" id="nav-users" data-view="users">
             <span class="nav-icon">👥</span>
-            <span>Equipo</span>
+            <span>Usuarios</span>
           </li>
           <li class="nav-item" id="nav-settings" data-view="settings">
             <span class="nav-icon">⚙️</span>
-            <span>Ajustes</span>
+            <span>Perfil</span>
           </li>
 
           <li class="nav-item hidden" id="nav-logout">
@@ -224,103 +224,65 @@
             <div>Jue</div>
             <div>Vie</div>
             <div>Sáb</div>
+            <div id="calendar-grid" class="calendar-grid"></div>
           </div>
-          <div id="calendar-grid" class="calendar-grid"></div>
-        </div>
       </section>
 
-      <!-- Management View (Super Admin Only) -->
-      <section id="management-view" class="view hidden">
+      <!-- Areas View -->
+      <section id="areas-view" class="view hidden">
         <div class="content-header">
-          <h1 class="content-title">Gestión de Áreas</h1>
-          <p class="content-subtitle">Administra las áreas del sistema y asigna líderes</p>
-        </div>
-        <div class="toolbar">
-          <button class="btn btn-primary" id="btn-new-area">
-            <span>🏗️</span>
+          <div>
+            <h1 class="content-title">Gestión de Áreas</h1>
+            <p class="content-subtitle">Administra los departamentos de la organización</p>
+          </div>
+          <button class="btn btn-primary admin-only" id="btn-new-area-main">
+            <span>➕</span>
             <span>Nueva Área</span>
           </button>
         </div>
-        <div id="areas-list" class="projects-grid">
+        <div id="areas-list-main" class="projects-grid">
           <!-- Areas will be rendered here -->
         </div>
       </section>
 
-      <!-- Team View (Area Leader Only) -->
-      <section id="team-view" class="view hidden">
+      <!-- Users View -->
+      <section id="users-view" class="view hidden">
         <div class="content-header">
-          <h1 class="content-title">Mi Equipo</h1>
-          <p class="content-subtitle">Gestiona los usuarios de tu área</p>
-        </div>
-        <div class="toolbar">
-          <button class="btn btn-primary" id="btn-add-member">
-            <span>👥</span>
-            <span>Agregar Miembro</span>
+          <div>
+            <h1 class="content-title">Gestión de Usuarios</h1>
+            <p class="content-subtitle">Control de acceso y roles de equipo</p>
+          </div>
+          <button class="btn btn-primary admin-only" id="btn-new-user-main">
+            <span>➕</span>
+            <span>Nuevo Usuario</span>
           </button>
         </div>
-        <div id="team-list" class="tasks-list">
-          <!-- Team members will be rendered here -->
+        <div id="users-list-main" class="tasks-list">
+          <!-- Users will be rendered here -->
         </div>
       </section>
 
       <!-- Settings View -->
       <section id="settings-view" class="view hidden">
         <div class="content-header">
-          <h1 class="content-title">Ajustes</h1>
-          <p class="content-subtitle">Gestiona tu perfil y el sistema</p>
+          <h1 class="content-title">Tu Perfil</h1>
+          <p class="content-subtitle">Gestiona tu información personal</p>
         </div>
 
-        <!-- Tabs Navigation -->
-        <div class="settings-tabs">
-          <button class="settings-tab active" data-tab="profile"> Perfil</button>
-          <button class="settings-tab admin-only hidden" id="tab-areas-btn" data-tab="areas"> Áreas</button>
-          <button class="settings-tab editor-only hidden" id="tab-users-btn" data-tab="users"> Usuarios</button>
-        </div>
-
-        <!-- Tab: Profile -->
-        <div id="tab-profile" class="settings-tab-content card">
-          <h3>Información Personal</h3>
-          <form id="settings-form">
+        <div class="card">
+          <form id="profile-form">
             <div class="form-group">
-              <label class="form-label">Usuario</label>
+              <label class="form-label">Nombre de Usuario</label>
               <input type="text" id="settings-username" class="form-input" readonly>
             </div>
             <div class="form-group">
-              <label class="form-label">Email</label>
-              <input type="email" id="settings-email" class="form-input">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Nueva Contraseña</label>
-              <input type="password" id="settings-new-password" class="form-input" placeholder="">
+              <label class="form-label">Correo Electrónico</label>
+              <input type="email" id="settings-email" class="form-input" readonly>
             </div>
             <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+              <button type="submit" class="btn btn-primary" disabled>Guardar Cambios</button>
             </div>
           </form>
-        </div>
-
-        <!-- Tab: Areas (Super Admin only) -->
-        <div id="tab-areas" class="settings-tab-content card hidden">
-          <div class="toolbar">
-            <h3>Gestión de Áreas</h3>
-            <button class="btn btn-primary" id="btn-new-area">
-              <span></span>
-              <span>Nueva Área</span>
-            </button>
-          </div>
-          <div id="areas-management-list" class="tasks-list"></div>
-        </div>
-
-        <!-- Tab: Users (Super Admin / Area Leader) -->
-        <div id="tab-users" class="settings-tab-content card hidden">
-          <div class="toolbar">
-            <h3>Gestión de Usuarios</h3>
-            <button class="btn btn-primary" id="btn-new-user">
-              <span></span>
-              <span>Crear Usuario</span>
-            </button>
-          </div>
-          <div id="users-management-list" class="tasks-list"></div>
         </div>
       </section>
     </main>

@@ -59,12 +59,15 @@ class DataManager {
       let tasksQuery = clientSB.from('tasks').select('*').order('created_at', { ascending: false });
 
       /* 
-      // Removed filtering to allow Guests to see ALL info (Read Only)
-      if (this.profile && this.profile.role !== 'super_admin') {
+      // Filter logic: Local users only see their area. 
+      // Super Admin and Global Admin (read-only) see EVERYTHING.
+      */
+      const isGlobalPower = this.profile?.role === 'super_admin' || this.profile?.role === 'admin';
+
+      if (this.profile && !isGlobalPower) {
         projectsQuery = projectsQuery.eq('area_id', this.profile.area_id);
         tasksQuery = tasksQuery.eq('area_id', this.profile.area_id);
       }
-      */
 
       const [{ data: projects, error: projectsError }, { data: tasks, error: tasksError }] = await Promise.all([
         projectsQuery,
@@ -89,7 +92,7 @@ class DataManager {
         updatedAt: t.updated_at
       }));
 
-      if (this.profile && this.profile.role === 'super_admin') {
+      if (this.profile && (this.profile.role === 'super_admin' || this.profile.role === 'admin')) {
         const { data: areas } = await clientSB.from('areas').select('*');
         this.areas = areas || [];
       }
@@ -403,16 +406,8 @@ class AuthController {
     await clientSB.auth.signOut();
   }
 
-  isAdmin() {
-    return this.ui.dataManager.profile?.role === 'super_admin';
-  }
-
-  isAreaLeader() {
-    return this.ui.dataManager.profile?.role === 'area_leader';
-  }
-
-  isViewer() {
-    return this.ui.dataManager.profile?.role === 'viewer';
+  isGlobalAdmin() {
+    return this.ui.dataManager.profile?.role === 'admin';
   }
 
   canEditProjects() {
@@ -420,29 +415,34 @@ class AuthController {
   }
 
   canEditTasks() {
-    return this.user && !this.isViewer();
+    // Admin (Global Viewer) cannot edit tasks
+    return this.user && !this.isViewer() && !this.isGlobalAdmin();
   }
 
   updateUIState() {
-    const profile = this.ui.dataManager.profile;
-    const isSuperAdmin = this.isAdmin();
-    const isAreaLeader = this.isAreaLeader();
-    const isViewer = this.isViewer();
+    const isGlobalAdmin = this.isGlobalAdmin();
     const canEditProjects = this.canEditProjects();
     const canEditTasks = this.canEditTasks();
 
     document.body.classList.toggle('guest-mode', !this.user);
     document.getElementById('nav-login').classList.toggle('hidden', !!this.user);
     document.getElementById('nav-logout').classList.toggle('hidden', !this.user);
-    document.getElementById('nav-settings').classList.toggle('hidden', !this.user); // Hide Settings if guest
+    document.getElementById('nav-settings').classList.toggle('hidden', !this.user);
 
-    // Multi-tenant visibility
-    document.getElementById('nav-management').classList.toggle('hidden', !isSuperAdmin);
-    document.getElementById('nav-team').classList.toggle('hidden', !isAreaLeader);
+    // Sidebar navigation visibility
+    const canSeeAreas = isSuperAdmin || isGlobalAdmin;
+    const canSeeUsers = isSuperAdmin || isGlobalAdmin || isAreaLeader;
+
+    document.getElementById('nav-areas').classList.toggle('hidden', !canSeeAreas);
+    document.getElementById('nav-users').classList.toggle('hidden', !canSeeUsers);
 
     // Sidebar text update
     const areaName = profile?.areas?.name || 'Invitado';
-    const roleLabel = isSuperAdmin ? 'Super Admin' : (profile ? areaName : 'Invitado');
+    let roleLabel = 'Invitado';
+    if (isSuperAdmin) roleLabel = 'Super Admin';
+    else if (isGlobalAdmin) roleLabel = 'Admin Global';
+    else if (profile) roleLabel = areaName;
+
     document.getElementById('user-area-tag').textContent = roleLabel;
 
     // Control visibility of admin/editor actions
@@ -497,8 +497,18 @@ class UIController {
 
     // Project Modal
     document.getElementById('btn-new-project').addEventListener('click', () => {
-      if (!auth.isAdmin()) return this.openAuthModal();
+      if (!auth.canEditProjects()) return this.openAuthModal();
       this.openProjectModal();
+    });
+
+    // Areas and Users main view buttons
+    document.getElementById('btn-new-area-main')?.addEventListener('click', () => {
+      document.getElementById('area-modal')?.classList.remove('hidden');
+      document.getElementById('area-form').reset();
+    });
+
+    document.getElementById('btn-new-user-main')?.addEventListener('click', () => {
+      this.openCreateUserModal(); // Wrapper for existing logic
     });
     document.getElementById('close-project-modal').addEventListener('click', () => this.closeProjectModal());
     document.getElementById('cancel-project').addEventListener('click', () => this.closeProjectModal());
@@ -1368,9 +1378,9 @@ ui.loadProfileData = function () {
   if (emailInput) emailInput.value = profile.email || '';
 };
 
-// Render Areas Management
-ui.renderAreasManagement = async function () {
-  const container = document.getElementById('areas-management-list');
+// Render Areas View (Dedicated View)
+ui.renderAreasView = async function () {
+  const container = document.getElementById('areas-list-main');
   if (!container) return;
 
   try {
@@ -1382,33 +1392,41 @@ ui.renderAreasManagement = async function () {
     if (error) throw error;
 
     if (!areas || areas.length === 0) {
-      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><p>No hay áreas creadas</p></div>';
+      container.innerHTML = '<div class="empty-state">No hay áreas creadas</div>';
       return;
     }
 
     container.innerHTML = areas.map(area => `
-      <div class="task-item">
-        <div class="task-content">
-          <div class="task-title">${this.escapeHtml(area.name)}</div>
-          <div class="task-meta">
-            <span>ID: ${this.escapeHtml(area.slug)}</span>
-            <span>Creada: ${new Date(area.created_at).toLocaleDateString('es-ES')}</span>
+      <div class="project-card">
+        <div class="project-header">
+          <h3 class="project-title">${this.escapeHtml(area.name)}</h3>
+          <div class="project-actions admin-only">
+            <button class="btn-icon btn-secondary" onclick="ui.editArea('${area.id}')">✏️</button>
           </div>
         </div>
-        <div class="task-actions admin-only">
-          <button class="btn-icon btn-secondary" onclick="ui.editArea('${area.id}')" title="Editar área"></button>
+        <div class="project-meta">
+          <div class="project-stat">
+            <span>🔖</span>
+            <span>Slug: ${this.escapeHtml(area.slug)}</span>
+          </div>
+          <div class="project-stat">
+            <span>📅</span>
+            <span>Creada: ${new Date(area.created_at).toLocaleDateString()}</span>
+          </div>
         </div>
       </div>
     `).join('');
+
+    auth.updateUIState(); // Refresh visibility of admin-only buttons
   } catch (error) {
     console.error('Error loading areas:', error);
-    container.innerHTML = '<div class="empty-state"><p>Error al cargar áreas</p></div>';
+    container.innerHTML = '<div class="empty-state">Error al cargar áreas</div>';
   }
 };
 
-// Render Users Management
-ui.renderUsersManagement = async function () {
-  const container = document.getElementById('users-management-list');
+// Render Users View (Dedicated View)
+ui.renderUsersView = async function () {
+  const container = document.getElementById('users-list-main');
   if (!container) return;
 
   try {
@@ -1417,32 +1435,33 @@ ui.renderUsersManagement = async function () {
       .select('*, areas(name)')
       .order('created_at', { ascending: false });
 
-    // Area leaders only see their area users
+    // Global Roles see all. Area Leaders only see their area.
     const profile = this.dataManager.profile;
-    if (profile?.role === 'area_leader' && profile?.area_id) {
+    const isGlobal = profile?.role === 'super_admin' || profile?.role === 'admin';
+
+    if (profile?.role === 'area_leader' && !isGlobal) {
       query = query.eq('area_id', profile.area_id);
     }
 
     const { data: users, error } = await query;
-
     if (error) throw error;
 
     if (!users || users.length === 0) {
-      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><p>No hay usuarios</p></div>';
+      container.innerHTML = '<div class="empty-state">No hay usuarios registrados</div>';
       return;
     }
 
     const roleColors = {
       'super_admin': 'completed',
+      'admin': 'progress',
       'area_leader': 'progress',
-      'viewer': 'pending',
       'user': 'pending'
     };
 
     const roleNames = {
       'super_admin': 'Super Admin',
+      'admin': 'Admin Global (Lectura)',
       'area_leader': 'Líder de Área',
-      'viewer': 'Viewer',
       'user': 'Usuario'
     };
 
@@ -1454,18 +1473,18 @@ ui.renderUsersManagement = async function () {
             <span class="badge badge-${roleColors[user.role] || 'pending'}">${roleNames[user.role] || user.role}</span>
           </div>
           <div class="task-meta">
-            <span> ${user.email || 'Sin email'}</span>
-            ${user.areas ? `<span> ${this.escapeHtml(user.areas.name)}</span>` : '<span>Sin área</span>'}
+            <span>📧 ${user.email || 'Sin email'}</span>
+            ${user.areas ? `<span>🏢 ${this.escapeHtml(user.areas.name)}</span>` : '<span>🌐 Sin área asignada</span>'}
+            <span>📅 Desde: ${new Date(user.created_at).toLocaleDateString()}</span>
           </div>
-        </div>
-        <div class="task-actions editor-only">
-          <button class="btn-icon btn-secondary" title="Ver detalles"></button>
         </div>
       </div>
     `).join('');
+
+    auth.updateUIState();
   } catch (error) {
     console.error('Error loading users:', error);
-    container.innerHTML = '<div class="empty-state"><p>Error al cargar usuarios</p></div>';
+    container.innerHTML = '<div class="empty-state">Error al cargar usuarios</div>';
   }
 };
 
@@ -1499,7 +1518,7 @@ document.getElementById('area-form')?.addEventListener('submit', async (e) => {
 
     alert(' Área creada exitosamente');
     document.getElementById('area-modal').classList.add('hidden');
-    ui.renderAreasManagement();
+    ui.renderAreasView();
   } catch (error) {
     alert(' Error al crear área: ' + error.message);
   }
@@ -1554,7 +1573,7 @@ document.getElementById('user-form')?.addEventListener('submit', async (e) => {
     alert('✅ Usuario creado exitosamente');
     document.getElementById('user-modal').classList.add('hidden');
     e.target.reset();
-    ui.renderUsersManagement();
+    ui.renderUsersView();
   } catch (error) {
     alert('❌ Error al crear usuario: ' + error.message);
   } finally {
@@ -1563,8 +1582,8 @@ document.getElementById('user-form')?.addEventListener('submit', async (e) => {
   }
 });
 
-// User Modal Event Listeners
-document.getElementById('btn-new-user')?.addEventListener('click', () => {
+// Helper to open User Creator Modal
+ui.openCreateUserModal = function () {
   // Populate areas dropdown
   const selectArea = document.getElementById('user-area');
   if (selectArea) {
@@ -1574,8 +1593,8 @@ document.getElementById('btn-new-user')?.addEventListener('click', () => {
     });
   }
 
-  // Show/hide role selector for area leaders
-  const profile = dataManager.profile;
+  // Show/hide role selector based on login role
+  const profile = this.dataManager.profile;
   if (profile?.role === 'area_leader') {
     document.getElementById('user-role').value = 'user';
     document.getElementById('user-role-group')?.classList.add('hidden');
@@ -1589,36 +1608,28 @@ document.getElementById('btn-new-user')?.addEventListener('click', () => {
   }
 
   document.getElementById('user-modal')?.classList.remove('hidden');
-});
-
-document.getElementById('close-user-modal')?.addEventListener('click', () => {
-  document.getElementById('user-modal')?.classList.add('hidden');
-});
-
-document.getElementById('cancel-user')?.addEventListener('click', () => {
-  document.getElementById('user-modal')?.classList.add('hidden');
-});
-
-// Area Management Helper
-ui.editArea = function (id) {
-  const area = this.dataManager.areas.find(a => a.id === id);
-  if (!area) return;
-
-  document.getElementById('area-id').value = area.id;
-  document.getElementById('area-name').value = area.name;
-  document.getElementById('area-slug').value = area.slug;
-  document.getElementById('area-submit-text').textContent = 'Actualizar Área';
-  document.getElementById('area-modal')?.classList.remove('hidden');
 };
 
-// Initialize tabs when navigating to settings
-const originalNavigateTo = ui.navigateTo.bind(ui);
-ui.navigateTo = function (view) {
-  originalNavigateTo(view);
-  if (view === 'settings') {
-    this.setupSettingsTabs();
+// Cleanup old tab listeners and unused setup
+ui.setupSettingsTabs = function () { }; // No longer needed
+ui.loadProfileData = function () {
+  const profile = this.dataManager.profile;
+  if (!profile) return;
+  document.getElementById('settings-username').value = profile.username || profile.email?.split('@')[0] || 'usuario';
+  document.getElementById('settings-email').value = profile.email || '';
+};
+
+// Update SwitchView to handle new routes
+const originalSwitchView = ui.switchView.bind(ui);
+ui.switchView = function (view) {
+  originalSwitchView(view);
+  if (view === 'areas') {
+    this.renderAreasView();
+  } else if (view === 'users') {
+    this.renderUsersView();
+  } else if (view === 'settings') {
     this.loadProfileData();
   }
 };
 
-console.log(' Parte 2: Settings tabs cargado');
+console.log(' Fase 3: Gestión explícita y Roles Globales cargados');
