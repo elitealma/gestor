@@ -1067,23 +1067,34 @@ class UIController {
 
   async handleAuthSubmit(e) {
     e.preventDefault();
-    const email = document.getElementById('auth-email').value;
+    const input = document.getElementById('auth-email').value;
     const password = document.getElementById('auth-password').value;
     const submitBtn = e.target.querySelector('button[type="submit"]');
+
+    // Username support: append @gestor.local if not an email
+    const email = input.includes('@') ? input : `${input}@gestor.local`;
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Procesando...';
 
     try {
       if (this.currentAuthTab === 'register') {
-        await auth.register(email, password);
+        const { error } = await clientSB.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { username: input.includes('@') ? input.split('@')[0] : input }
+          }
+        });
+        if (error) throw error;
         alert('Registro exitoso. Ya puedes iniciar sesión.');
         this.closeAuthModal();
-        return; // Stop here for registration
+        return;
       } else {
         await auth.login(email, password);
       }
       this.closeAuthModal();
+      window.location.reload();
     } catch (error) {
       alert('Error: ' + error.message);
     } finally {
@@ -1092,7 +1103,6 @@ class UIController {
     }
   }
 
-  // Search and Filter
   handleSearchProjects(e) {
     const search = e.target.value;
     const filter = document.getElementById('filter-projects').value;
@@ -1234,30 +1244,30 @@ ui.auth = auth;
 // ===== PARTE 1: MODAL DE CALENDARIO - TAREAS DEL DÍA =====
 
 // Función para abrir modal de tareas del día
-ui.openDayTasksModal = function(dateStr) {
+ui.openDayTasksModal = function (dateStr) {
   const modal = document.getElementById('day-tasks-modal');
   if (!modal) return;
-  
+
   const title = document.getElementById('day-tasks-title');
   const container = document.getElementById('day-tasks-list');
-  
+
   const tasks = this.dataManager.getTasksByDate(dateStr);
   const date = new Date(dateStr + 'T12:00:00');
-  const dateFormatted = date.toLocaleDateString('es-ES', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+  const dateFormatted = date.toLocaleDateString('es-ES', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
   });
-  
+
   title.textContent = `Tareas del ${dateFormatted}`;
-  
+
   if (tasks.length === 0) {
     container.innerHTML = '<div class="empty-state">No hay tareas para este día</div>';
   } else {
     container.innerHTML = tasks.map(task => this.renderTaskItem(task)).join('');
   }
-  
+
   modal.classList.remove('hidden');
   modal.dataset.selectedDate = dateStr;
 };
@@ -1279,14 +1289,14 @@ document.getElementById('btn-add-task-from-day')?.addEventListener('click', () =
 
 // Modificar createCalendarDay para agregar click handler
 const originalCreateCalendarDay = ui.createCalendarDay.bind(ui);
-ui.createCalendarDay = function(day, month, year, isOtherMonth = false) {
+ui.createCalendarDay = function (day, month, year, isOtherMonth = false) {
   const dayEl = originalCreateCalendarDay(day, month, year, isOtherMonth);
   const date = new Date(year, month, day);
   const dateStr = formatDateYYYYMMDD(date);
-  
+
   // Agregar data attribute para la fecha
   dayEl.dataset.date = dateStr;
-  
+
   // Modificar el click handler
   const oldOnclick = dayEl.onclick;
   dayEl.onclick = (e) => {
@@ -1298,7 +1308,7 @@ ui.createCalendarDay = function(day, month, year, isOtherMonth = false) {
       this.openDayTasksModal(dateStr);
     }
   };
-  
+
   return dayEl;
 };
 
@@ -1307,9 +1317,9 @@ console.log(' Parte 1: Modal de calendario cargado');
 // ===== PARTE 2: TABS EN SETTINGS =====
 
 // Setup Settings Tabs
-ui.setupSettingsTabs = function() {
+ui.setupSettingsTabs = function () {
   const profile = this.dataManager.profile;
-  
+
   // Show/hide tabs based on role
   if (profile?.role === 'super_admin') {
     document.getElementById('tab-areas-btn')?.classList.remove('hidden');
@@ -1323,17 +1333,17 @@ ui.setupSettingsTabs = function() {
     tab.onclick = (e) => {
       const tabName = e.target.dataset.tab;
       if (!tabName) return;
-      
+
       // Update active tab
       document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
       e.target.classList.add('active');
-      
+
       // Show corresponding content
       document.querySelectorAll('.settings-tab-content').forEach(content => {
         content.classList.add('hidden');
       });
       document.getElementById(`tab-${tabName}`)?.classList.remove('hidden');
-      
+
       // Load data for tab
       if (tabName === 'areas') {
         this.renderAreasManagement();
@@ -1347,30 +1357,30 @@ ui.setupSettingsTabs = function() {
 };
 
 // Load profile data
-ui.loadProfileData = function() {
+ui.loadProfileData = function () {
   const profile = this.dataManager.profile;
   if (!profile) return;
-  
+
   const usernameInput = document.getElementById('settings-username');
   const emailInput = document.getElementById('settings-email');
-  
+
   if (usernameInput) usernameInput.value = profile.username || profile.email?.split('@')[0] || 'usuario';
   if (emailInput) emailInput.value = profile.email || '';
 };
 
 // Render Areas Management
-ui.renderAreasManagement = async function() {
+ui.renderAreasManagement = async function () {
   const container = document.getElementById('areas-management-list');
   if (!container) return;
-  
+
   try {
     const { data: areas, error } = await clientSB
       .from('areas')
       .select('*')
       .order('name');
-    
+
     if (error) throw error;
-    
+
     if (!areas || areas.length === 0) {
       container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><p>No hay áreas creadas</p></div>';
       return;
@@ -1397,26 +1407,26 @@ ui.renderAreasManagement = async function() {
 };
 
 // Render Users Management
-ui.renderUsersManagement = async function() {
+ui.renderUsersManagement = async function () {
   const container = document.getElementById('users-management-list');
   if (!container) return;
-  
+
   try {
     let query = clientSB
       .from('profiles')
       .select('*, areas(name)')
       .order('created_at', { ascending: false });
-    
+
     // Area leaders only see their area users
     const profile = this.dataManager.profile;
     if (profile?.role === 'area_leader' && profile?.area_id) {
       query = query.eq('area_id', profile.area_id);
     }
-    
+
     const { data: users, error } = await query;
-    
+
     if (error) throw error;
-    
+
     if (!users || users.length === 0) {
       container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><p>No hay usuarios</p></div>';
       return;
@@ -1428,7 +1438,7 @@ ui.renderUsersManagement = async function() {
       'viewer': 'pending',
       'user': 'pending'
     };
-    
+
     const roleNames = {
       'super_admin': 'Super Admin',
       'area_leader': 'Líder de Área',
@@ -1476,17 +1486,17 @@ document.getElementById('cancel-area')?.addEventListener('click', () => {
 
 document.getElementById('area-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  
+
   const name = document.getElementById('area-name').value;
   const slug = document.getElementById('area-slug').value;
-  
+
   try {
     const { error } = await clientSB
       .from('areas')
       .insert([{ name, slug }]);
-    
+
     if (error) throw error;
-    
+
     alert(' Área creada exitosamente');
     document.getElementById('area-modal').classList.add('hidden');
     ui.renderAreasManagement();
@@ -1495,17 +1505,75 @@ document.getElementById('area-form')?.addEventListener('submit', async (e) => {
   }
 });
 
-// User Modal Handlers
+// User Management - Create user with username/password (admin only)
+const createUserWithUsername = async (username, password, role, areaId) => {
+  try {
+    const email = `${username}@gestor.local`;
+
+    // 1. Create user in Supabase Auth
+    const { data: authData, error: authError } = await clientSB.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { username, role, area_id: areaId }
+      }
+    });
+
+    if (authError) throw authError;
+
+    // 2. Profile table is usually updated via trigger in Supabase, 
+    // but we ensure it has the correct role and area_id
+    const { error: profileError } = await clientSB
+      .from('profiles')
+      .update({ username, role, area_id: areaId })
+      .eq('id', authData.user.id);
+
+    if (profileError) throw profileError;
+
+    return authData.user;
+  } catch (error) {
+    console.error('Error in createUserWithUsername:', error);
+    throw error;
+  }
+};
+
+document.getElementById('user-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const username = document.getElementById('user-username').value;
+  const password = document.getElementById('user-password').value;
+  const role = document.getElementById('user-role').value;
+  const areaId = document.getElementById('user-area').value || null;
+
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Creando...';
+
+  try {
+    await createUserWithUsername(username, password, role, areaId);
+    alert('✅ Usuario creado exitosamente');
+    document.getElementById('user-modal').classList.add('hidden');
+    e.target.reset();
+    ui.renderUsersManagement();
+  } catch (error) {
+    alert('❌ Error al crear usuario: ' + error.message);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Crear Usuario';
+  }
+});
+
+// User Modal Event Listeners
 document.getElementById('btn-new-user')?.addEventListener('click', () => {
   // Populate areas dropdown
   const selectArea = document.getElementById('user-area');
   if (selectArea) {
     clientSB.from('areas').select('*').order('name').then(({ data }) => {
-      selectArea.innerHTML = '<option value="">Sin área</option>' + 
+      selectArea.innerHTML = '<option value="">Sin área</option>' +
         (data || []).map(area => `<option value="${area.id}">${area.name}</option>`).join('');
     });
   }
-  
+
   // Show/hide role selector for area leaders
   const profile = dataManager.profile;
   if (profile?.role === 'area_leader') {
@@ -1519,7 +1587,7 @@ document.getElementById('btn-new-user')?.addEventListener('click', () => {
     document.getElementById('user-role-group')?.classList.remove('hidden');
     document.getElementById('user-area-group')?.classList.remove('hidden');
   }
-  
+
   document.getElementById('user-modal')?.classList.remove('hidden');
 });
 
@@ -1531,9 +1599,21 @@ document.getElementById('cancel-user')?.addEventListener('click', () => {
   document.getElementById('user-modal')?.classList.add('hidden');
 });
 
+// Area Management Helper
+ui.editArea = function (id) {
+  const area = this.dataManager.areas.find(a => a.id === id);
+  if (!area) return;
+
+  document.getElementById('area-id').value = area.id;
+  document.getElementById('area-name').value = area.name;
+  document.getElementById('area-slug').value = area.slug;
+  document.getElementById('area-submit-text').textContent = 'Actualizar Área';
+  document.getElementById('area-modal')?.classList.remove('hidden');
+};
+
 // Initialize tabs when navigating to settings
 const originalNavigateTo = ui.navigateTo.bind(ui);
-ui.navigateTo = function(view) {
+ui.navigateTo = function (view) {
   originalNavigateTo(view);
   if (view === 'settings') {
     this.setupSettingsTabs();
