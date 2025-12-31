@@ -1676,12 +1676,16 @@ const createUserWithUsername = async (username, password, role, areaId) => {
 
     if (authError) throw authError;
 
-    // 2. Profile table is usually updated via trigger in Supabase, 
-    // but we ensure it has the correct role and area_id
+    // 2. Profile table: use UPSERT to ensure the row exists and is updated
     const { error: profileError } = await clientSB
       .from('profiles')
-      .update({ username, role, area_id: areaId })
-      .eq('id', authData.user.id);
+      .upsert({
+        id: authData.user.id,
+        email,
+        username,
+        role,
+        area_id: areaId
+      }, { onConflict: 'id' });
 
     if (profileError) throw profileError;
 
