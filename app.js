@@ -2,48 +2,58 @@ const SUPABASE_URL = 'https://vwlfyautuvioxfzvogah.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3bGZ5YXV0dXZpb3hmenZvZ2FoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MzA0NDYsImV4cCI6MjA3ODAwNjQ0Nn0.4OjTvjf6HfilcdjFZaLHOkTqcjvMBEU7nRG5QWLWj-Y';
 const clientSB = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+const formatDateYYYYMMDD = (date) => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 // ===== DATA MODEL =====
 class DataManager {
   constructor() {
     this.projects = [];
     this.tasks = [];
     this.areas = [];
+    this.users = []; // Lista de usuarios para asignación
     this.profile = null;
     this.currentView = 'dashboard';
+    this.realtimeSubscriptions = []; // Real-time subscriptions
   }
 
   // Supabase Data Fetching
   async loadInitialData() {
     try {
-      if (!auth.user) return false;
-
-      // Fetch Profile
-      let { data: profile } = await clientSB
-        .from('profiles')
-        .select('*, areas(*)')
-        .eq('id', auth.user.id)
-        .maybeSingle();
-
-      // JIT Profile Creation if missing (Fallback for trigger failures)
-      if (!profile && auth.user) {
-        const { data: newProfile, error: insertError } = await clientSB
+      let profile = null;
+      if (auth.user) {
+        let { data: existingProfile } = await clientSB
           .from('profiles')
-          .insert([{
-            id: auth.user.id,
-            email: auth.user.email,
-            role: auth.user.email === 'elitealmaia@gmail.com' ? 'super_admin' : 'user'
-          }])
           .select('*, areas(*)')
+          .eq('id', auth.user.id)
           .maybeSingle();
 
-        if (!insertError) {
-          profile = newProfile;
-        } else {
-          console.error('Error creating JIT profile:', insertError);
+        if (!existingProfile) {
+          const { data: newProfile, error: insertError } = await clientSB
+            .from('profiles')
+            .insert([{
+              id: auth.user.id,
+              email: auth.user.email,
+              role: auth.user.email === 'elitealmaia@gmail.com' ? 'super_admin' : 'user'
+            }])
+            .select('*, areas(*)')
+            .maybeSingle();
+
+          if (!insertError) {
+            existingProfile = newProfile;
+          } else {
+            console.error('Error creating JIT profile:', insertError);
+          }
         }
+
+        profile = existingProfile;
       }
 
-      this.profile = profile;
+      this.profile = profile || null;
 
       let projectsQuery = clientSB.from('projects').select('*').order('created_at', { ascending: false });
       let tasksQuery = clientSB.from('tasks').select('*').order('created_at', { ascending: false });
@@ -56,10 +66,13 @@ class DataManager {
       }
       */
 
-      const [{ data: projects }, { data: tasks }] = await Promise.all([
+      const [{ data: projects, error: projectsError }, { data: tasks, error: tasksError }] = await Promise.all([
         projectsQuery,
         tasksQuery
       ]);
+
+      if (projectsError) throw projectsError;
+      if (tasksError) throw tasksError;
 
       this.projects = (projects || []).map(p => ({
         ...p,
@@ -70,7 +83,8 @@ class DataManager {
       this.tasks = (tasks || []).map(t => ({
         ...t,
         projectId: t.project_id,
-        dueDate: t.due_date,
+        assignedTo: t.assigned_to,
+        dueDate: t.due_date ? String(t.due_date).slice(0, 10) : '',
         createdAt: t.created_at,
         updatedAt: t.updated_at
       }));
@@ -79,6 +93,21 @@ class DataManager {
         const { data: areas } = await clientSB.from('areas').select('*');
         this.areas = areas || [];
       }
+
+      // Load users for task assignment (all profiles for admin, area users for area_leader)
+      if (this.profile) {
+        let usersQuery = clientSB.from('profiles').select('id, email, username, role, area_id');
+
+        if (this.profile.role === 'area_leader') {
+          usersQuery = usersQuery.eq('area_id', this.profile.area_id);
+        }
+
+        const { data: users } = await usersQuery;
+        this.users = users || [];
+      }
+
+      // Setup real-time subscriptions
+      this.setupRealtimeSync();
 
       return true;
     } catch (error) {
@@ -144,8 +173,9 @@ class DataManager {
         description: taskData.description,
         project_id: taskData.projectId,
         status: taskData.status,
-        due_date: taskData.dueDate || new Date().toISOString().split('T')[0],
-        area_id: this.profile?.area_id || null
+        due_date: taskData.dueDate || formatDateYYYYMMDD(new Date()),
+        area_id: this.profile?.area_id || null,
+        assigned_to: taskData.assignedTo || auth.user?.id || null
       }])
       .select();
 
@@ -153,6 +183,7 @@ class DataManager {
     const task = {
       ...data[0],
       projectId: data[0].project_id,
+      assignedTo: data[0].assigned_to,
       dueDate: data[0].due_date,
       createdAt: data[0].created_at,
       updatedAt: data[0].updated_at
@@ -168,6 +199,7 @@ class DataManager {
     if (taskData.projectId) updatePayload.project_id = taskData.projectId;
     if (taskData.status) updatePayload.status = taskData.status;
     if (taskData.dueDate) updatePayload.due_date = taskData.dueDate;
+    if (taskData.assignedTo !== undefined) updatePayload.assigned_to = taskData.assignedTo;
     updatePayload.updated_at = new Date().toISOString();
 
     const { data, error } = await clientSB
@@ -180,6 +212,7 @@ class DataManager {
     const task = {
       ...data[0],
       projectId: data[0].project_id,
+      assignedTo: data[0].assigned_to,
       dueDate: data[0].due_date,
       createdAt: data[0].created_at,
       updatedAt: data[0].updated_at
@@ -221,12 +254,116 @@ class DataManager {
   }
 
   getTodayTasks() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatDateYYYYMMDD(new Date());
     return this.tasks.filter(task => task.dueDate === today);
   }
 
   getTasksByDate(date) {
     return this.tasks.filter(task => task.dueDate === date);
+  }
+
+  getProjectsByDeadline(date) {
+    // Get projects that have a deadline on this date
+    // For now, we'll use created_at + 30 days as example or you can add a deadline field to projects
+    return [];
+  }
+
+  getCalendarItemsByDate(date) {
+    const tasks = this.getTasksByDate(date);
+    const items = tasks.map(t => ({
+      type: 'task',
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      assignedTo: t.assignedTo,
+      projectId: t.projectId
+    }));
+    return items;
+  }
+
+  getUserById(userId) {
+    return this.users.find(u => u.id === userId);
+  }
+
+  // Real-time sync setup
+  setupRealtimeSync() {
+    // Cleanup existing subscriptions
+    this.realtimeSubscriptions.forEach(sub => {
+      clientSB.removeChannel(sub);
+    });
+    this.realtimeSubscriptions = [];
+
+    // Subscribe to projects changes
+    const projectsChannel = clientSB
+      .channel('projects-changes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'projects' },
+        (payload) => this.handleProjectChange(payload)
+      )
+      .subscribe();
+
+    // Subscribe to tasks changes
+    const tasksChannel = clientSB
+      .channel('tasks-changes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks' },
+        (payload) => this.handleTaskChange(payload)
+      )
+      .subscribe();
+
+    this.realtimeSubscriptions = [projectsChannel, tasksChannel];
+  }
+
+  handleProjectChange(payload) {
+    if (payload.eventType === 'INSERT') {
+      const newProject = { ...payload.new, createdAt: payload.new.created_at, updatedAt: payload.new.updated_at };
+      if (!this.projects.find(p => p.id === newProject.id)) {
+        this.projects.unshift(newProject);
+        ui?.refreshCurrentView();
+      }
+    } else if (payload.eventType === 'UPDATE') {
+      const index = this.projects.findIndex(p => p.id === payload.new.id);
+      if (index !== -1) {
+        this.projects[index] = { ...payload.new, createdAt: payload.new.created_at, updatedAt: payload.new.updated_at };
+        ui?.refreshCurrentView();
+      }
+    } else if (payload.eventType === 'DELETE') {
+      this.projects = this.projects.filter(p => p.id !== payload.old.id);
+      ui?.refreshCurrentView();
+    }
+  }
+
+  handleTaskChange(payload) {
+    if (payload.eventType === 'INSERT') {
+      const newTask = {
+        ...payload.new,
+        projectId: payload.new.project_id,
+        assignedTo: payload.new.assigned_to,
+        dueDate: payload.new.due_date ? String(payload.new.due_date).slice(0, 10) : '',
+        createdAt: payload.new.created_at,
+        updatedAt: payload.new.updated_at
+      };
+      if (!this.tasks.find(t => t.id === newTask.id)) {
+        this.tasks.unshift(newTask);
+        ui?.refreshCurrentView();
+      }
+    } else if (payload.eventType === 'UPDATE') {
+      const index = this.tasks.findIndex(t => t.id === payload.new.id);
+      if (index !== -1) {
+        this.tasks[index] = {
+          ...payload.new,
+          projectId: payload.new.project_id,
+          assignedTo: payload.new.assigned_to,
+          dueDate: payload.new.due_date ? String(payload.new.due_date).slice(0, 10) : '',
+          createdAt: payload.new.created_at,
+          updatedAt: payload.new.updated_at
+        };
+        ui?.refreshCurrentView();
+      }
+    } else if (payload.eventType === 'DELETE') {
+      this.tasks = this.tasks.filter(t => t.id !== payload.old.id);
+      ui?.refreshCurrentView();
+    }
   }
 }
 
@@ -247,6 +384,7 @@ class AuthController {
       this.user = session?.user || null;
       this.updateUIState();
       await this.ui.dataManager.loadInitialData();
+      this.updateUIState();
       this.ui.refreshCurrentView();
     });
   }
@@ -273,11 +411,25 @@ class AuthController {
     return this.ui.dataManager.profile?.role === 'area_leader';
   }
 
+  isViewer() {
+    return this.ui.dataManager.profile?.role === 'viewer';
+  }
+
+  canEditProjects() {
+    return this.isAdmin() || this.isAreaLeader();
+  }
+
+  canEditTasks() {
+    return this.user && !this.isViewer();
+  }
+
   updateUIState() {
     const profile = this.ui.dataManager.profile;
     const isSuperAdmin = this.isAdmin();
     const isAreaLeader = this.isAreaLeader();
-    const canEdit = isSuperAdmin || isAreaLeader;
+    const isViewer = this.isViewer();
+    const canEditProjects = this.canEditProjects();
+    const canEditTasks = this.canEditTasks();
 
     document.body.classList.toggle('guest-mode', !this.user);
     document.getElementById('nav-login').classList.toggle('hidden', !!this.user);
@@ -293,9 +445,13 @@ class AuthController {
     const roleLabel = isSuperAdmin ? 'Super Admin' : (profile ? areaName : 'Invitado');
     document.getElementById('user-area-tag').textContent = roleLabel;
 
-    // Control visibility of admin actions
+    // Control visibility of admin/editor actions
     document.querySelectorAll('.admin-only').forEach(el => {
-      el.classList.toggle('hidden', !canEdit);
+      el.classList.toggle('hidden', !canEditProjects);
+    });
+
+    document.querySelectorAll('.editor-only').forEach(el => {
+      el.classList.toggle('hidden', !canEditTasks);
     });
   }
 }
@@ -313,6 +469,7 @@ class UIController {
     this.currentDate = new Date();
     this.setupEventListeners();
     this.dataManager.loadInitialData().then(() => {
+      auth.updateUIState();
       this.refreshCurrentView();
     });
   }
@@ -419,7 +576,7 @@ class UIController {
         <div class="empty-state">
           <div class="empty-state-icon">📁</div>
           <div class="empty-state-text">No hay proyectos aún</div>
-          <button class="btn btn-primary mt-xl" onclick="ui.switchView('projects'); ui.openProjectModal();">
+          <button class="btn btn-primary mt-xl admin-only" onclick="ui.switchView('projects'); ui.openProjectModal();">
             <span>➕</span>
             <span>Crear Primer Proyecto</span>
           </button>
@@ -434,6 +591,7 @@ class UIController {
   renderTodayTasks() {
     const todayTasks = this.dataManager.getTodayTasks();
     const container = document.getElementById('today-tasks-list');
+    const canInteract = !!auth.user;
 
     if (todayTasks.length === 0) {
       container.innerHTML = '<div class="empty-state">No hay tareas para hoy</div>';
@@ -441,9 +599,9 @@ class UIController {
     }
 
     container.innerHTML = todayTasks.map(task => `
-      <div class="task-item" onclick="ui.editTask('${task.id}')" style="cursor: pointer;">
+      <div class="task-item" ${canInteract ? `onclick="ui.editTask('${task.id}')"` : ''} style="${canInteract ? 'cursor: pointer;' : ''}">
         <div class="task-checkbox ${task.status === 'completed' ? 'checked' : ''}" 
-             onclick="event.stopPropagation(); ui.toggleTaskStatus('${task.id}')"></div>
+             ${canInteract ? `onclick="event.stopPropagation(); ui.toggleTaskStatus('${task.id}')"` : ''}></div>
         <div class="task-content">
           <div class="task-title ${task.status === 'completed' ? 'completed' : ''}">${this.escapeHtml(task.title)}</div>
         </div>
@@ -572,21 +730,24 @@ class UIController {
 
   renderTaskItem(task) {
     const project = this.dataManager.getProject(task.projectId);
+    const assignedUser = task.assignedTo ? this.dataManager.getUserById(task.assignedTo) : null;
     const statusBadge = this.getStatusBadge(task.status);
     const isCompleted = task.status === 'completed';
+    const canInteract = !!auth.user;
 
     return `
       <div class="task-item">
-        <div class="task-checkbox ${isCompleted ? 'checked' : ''}" onclick="ui.toggleTaskStatus('${task.id}')"></div>
+        <div class="task-checkbox ${isCompleted ? 'checked' : ''}" ${canInteract ? `onclick="ui.toggleTaskStatus('${task.id}')"` : ''}></div>
         <div class="task-content">
           <div class="task-title ${isCompleted ? 'completed' : ''}">${this.escapeHtml(task.title)}</div>
           <div class="task-meta">
             <span>📁 ${project ? this.escapeHtml(project.name) : 'Sin proyecto'}</span>
             <span>📅 ${task.dueDate}</span>
+            ${assignedUser ? `<span>👤 ${this.escapeHtml(assignedUser.email || assignedUser.username || 'Usuario')}</span>` : ''}
             ${statusBadge}
           </div>
         </div>
-        <div class="task-actions admin-only">
+        <div class="task-actions editor-only">
           <button class="btn-icon btn-secondary" onclick="ui.editTask('${task.id}')" title="Editar tarea">
             ✏️
           </button>
@@ -635,18 +796,28 @@ class UIController {
 
   createCalendarDay(day, month, year, isOtherMonth = false) {
     const date = new Date(year, month, day);
-    const dateStr = date.toISOString().split('T')[0];
-    const tasks = this.dataManager.getTasksByDate(dateStr);
-    const isToday = dateStr === new Date().toISOString().split('T')[0];
+    const dateStr = formatDateYYYYMMDD(date);
+    const items = this.dataManager.getCalendarItemsByDate(dateStr);
+    const isToday = dateStr === formatDateYYYYMMDD(new Date());
 
     const dayEl = document.createElement('div');
-    dayEl.className = `calendar-day ${isOtherMonth ? 'other-month' : ''} ${isToday ? 'today' : ''}`;
-    dayEl.onclick = () => this.openTaskModalForDate(dateStr);
+    dayEl.className = `calendar-day ${isOtherMonth ? 'other-month' : ''} ${isToday ? 'today' : ''} ${items.length > 0 ? 'has-items' : ''}`;
+    if (auth.user) dayEl.onclick = () => this.openTaskModalForDate(dateStr);
+
+    const itemsList = items.map(item => {
+      if (item.type === 'task') {
+        const assignedUser = item.assignedTo ? this.dataManager.getUserById(item.assignedTo) : null;
+        const userInitial = assignedUser ? (assignedUser.email?.[0] || assignedUser.username?.[0] || '?').toUpperCase() : '';
+        const project = this.dataManager.getProject(item.projectId);
+        return `<div class="calendar-task-dot ${item.status === 'completed' ? 'completed' : ''}" title="${this.escapeHtml(item.title)}${assignedUser ? ' - ' + (assignedUser.email || assignedUser.username) : ''}${project ? ' [' + this.escapeHtml(project.name) + ']' : ''}">${userInitial ? userInitial + ': ' : ''}${this.escapeHtml(item.title)}</div>`;
+      }
+      return '';
+    }).join('');
 
     dayEl.innerHTML = `
       <div class="day-number">${day}</div>
       <div class="day-tasks">
-        ${tasks.map(t => `<div class="calendar-task-dot ${t.status === 'completed' ? 'completed' : ''}">${this.escapeHtml(t.title)}</div>`).join('')}
+        ${itemsList}
       </div>
     `;
 
@@ -706,7 +877,7 @@ class UIController {
 
   async handleProjectSubmit(e) {
     e.preventDefault();
-    if (!auth.isAdmin()) return this.openAuthModal();
+    if (!auth.canEditProjects()) return this.openAuthModal();
 
     const id = document.getElementById('project-id').value;
     const projectData = {
@@ -729,12 +900,12 @@ class UIController {
   }
 
   editProject(id) {
-    if (!auth.isAdmin()) return this.openAuthModal();
+    if (!auth.canEditProjects()) return this.openAuthModal();
     this.openProjectModal(id);
   }
 
   async deleteProject(id) {
-    if (!auth.isAdmin()) return this.openAuthModal();
+    if (!auth.canEditProjects()) return this.openAuthModal();
     if (confirm('¿Estás seguro de que quieres eliminar este proyecto? Se eliminarán todas sus tareas.')) {
       await this.dataManager.deleteProject(id);
       this.refreshCurrentView();
@@ -748,6 +919,7 @@ class UIController {
     const title = document.getElementById('task-modal-title');
     const submitText = document.getElementById('task-submit-text');
     const projectSelect = document.getElementById('task-project');
+    const userSelect = document.getElementById('task-assigned-user');
 
     form.reset();
 
@@ -757,8 +929,16 @@ class UIController {
         `<option value="${p.id}" ${projectId === p.id ? 'selected' : ''}>${this.escapeHtml(p.name)}</option>`
       ).join('');
 
+    // Populate user select
+    if (userSelect && this.dataManager.users.length > 0) {
+      userSelect.innerHTML = '<option value="">Sin asignar</option>' +
+        this.dataManager.users.map(u =>
+          `<option value="${u.id}" ${u.id === auth.user?.id ? 'selected' : ''}>${this.escapeHtml(u.email || u.username || 'Usuario')}</option>`
+        ).join('');
+    }
+
     document.getElementById('task-id').value = '';
-    document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('task-date').value = formatDateYYYYMMDD(new Date());
     if (projectId) {
       document.getElementById('task-project-id').value = projectId;
       projectSelect.value = projectId;
@@ -775,15 +955,17 @@ class UIController {
 
   async handleTaskSubmit(e) {
     e.preventDefault();
-    if (!auth.isAdmin()) return this.openAuthModal();
+    if (!auth.canEditTasks()) return this.openAuthModal();
 
     const id = document.getElementById('task-id').value;
+    const userSelect = document.getElementById('task-assigned-user');
     const taskData = {
       title: document.getElementById('task-title').value,
       description: document.getElementById('task-description').value,
       projectId: document.getElementById('task-project').value,
       status: document.getElementById('task-status').value,
-      dueDate: document.getElementById('task-date').value
+      dueDate: document.getElementById('task-date').value,
+      assignedTo: userSelect ? (userSelect.value || null) : (auth.user?.id || null)
     };
 
     try {
@@ -800,14 +982,18 @@ class UIController {
   }
 
   editTask(id) {
-    if (!auth.isAdmin()) return this.openAuthModal();
     const task = this.dataManager.getTask(id);
+    // Check if user can edit this task
+    if (!auth.canEditTasks() || (task.assignedTo && task.assignedTo !== auth.user?.id && !auth.canEditProjects())) {
+      return this.openAuthModal();
+    }
     if (!task) return;
 
     const modal = document.getElementById('task-modal');
     const title = document.getElementById('task-modal-title');
     const submitText = document.getElementById('task-submit-text');
     const projectSelect = document.getElementById('task-project');
+    const userSelect = document.getElementById('task-assigned-user');
 
     // Populate project select
     projectSelect.innerHTML = '<option value="">Selecciona un proyecto</option>' +
@@ -815,12 +1001,23 @@ class UIController {
         `<option value="${p.id}">${this.escapeHtml(p.name)}</option>`
       ).join('');
 
+    // Populate user select
+    if (userSelect && this.dataManager.users.length > 0) {
+      userSelect.innerHTML = '<option value="">Sin asignar</option>' +
+        this.dataManager.users.map(u =>
+          `<option value="${u.id}">${this.escapeHtml(u.email || u.username || 'Usuario')}</option>`
+        ).join('');
+    }
+
     document.getElementById('task-id').value = task.id;
     document.getElementById('task-title').value = task.title;
     document.getElementById('task-description').value = task.description || '';
     document.getElementById('task-project').value = task.projectId;
     document.getElementById('task-date').value = task.dueDate;
     document.getElementById('task-status').value = task.status;
+    if (userSelect) {
+      userSelect.value = task.assignedTo || '';
+    }
 
     title.textContent = 'Editar Tarea';
     submitText.textContent = 'Guardar Cambios';
@@ -829,7 +1026,10 @@ class UIController {
   }
 
   async deleteTask(id) {
-    if (!auth.isAdmin()) return this.openAuthModal();
+    const task = this.dataManager.getTask(id);
+    if (!auth.canEditTasks() || (task.assignedTo && task.assignedTo !== auth.user?.id && !auth.canEditProjects())) {
+      return this.openAuthModal();
+    }
     if (confirm('¿Estás seguro de que quieres eliminar esta tarea?')) {
       await this.dataManager.deleteTask(id);
       this.refreshCurrentView();
@@ -837,8 +1037,10 @@ class UIController {
   }
 
   async toggleTaskStatus(id) {
-    if (!auth.isAdmin()) return this.openAuthModal();
     const task = this.dataManager.getTask(id);
+    if (!auth.canEditTasks() || (task.assignedTo && task.assignedTo !== auth.user?.id && !auth.canEditProjects())) {
+      return this.openAuthModal();
+    }
     if (!task) return;
 
     const newStatus = task.status === 'completed' ? 'pending' : 'completed';

@@ -1173,3 +1173,73 @@ body::before {
 .tasks-list.minimal .task-item {
   padding: var(--spacing-sm) var(--spacing-md);
 }
+
+/* ===== ENHANCED RESPONSIVE DESIGN ===== */
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .calendar-grid { gap: 4px; }
+  .calendar-day { padding: 4px; aspect-ratio: 1/1.5; }
+  .day-number { font-size: var(--font-size-sm); }
+  .calendar-task-dot { font-size: 8px; padding: 1px 2px; }
+  
+  .modal { max-width: 100%; max-height: 100vh; border-radius: 0; padding: var(--spacing-lg); }
+  
+  .btn { padding: var(--spacing-lg); min-height: 44px; }
+  .btn-icon { min-width: 44px; min-height: 44px; }
+  
+  .form-input, .form-select, .form-textarea { padding: var(--spacing-lg); font-size: 16px; }
+  
+  .toolbar-actions .btn, .form-select { width: 100%; }
+  .nav-item { padding: var(--spacing-sm) var(--spacing-md); }
+  .project-card, .stat-card { padding: var(--spacing-lg); }
+}
+
+@media (max-width: 480px) {
+  .content-title { font-size: var(--font-size-xl); }
+  .stat-value { font-size: var(--font-size-3xl); }
+  .task-meta { flex-direction: column; gap: var(--spacing-xs); font-size: var(--font-size-xs); }
+  .calendar-weekdays { font-size: 10px; }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* Calendar Sync Enhancements */
+.calendar-day.has-items {
+  border-color: var(--accent-purple);
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.calendar-day.has-items:hover {
+  background: rgba(102, 126, 234, 0.15);
+  box-shadow: 0 0 12px rgba(102, 126, 234, 0.3);
+}
+
+.calendar-task-dot {
+  transition: all var(--transition-base);
+  cursor: pointer;
+}
+
+.calendar-task-dot:hover {
+  background: var(--accent-blue);
+  transform: scale(1.05);
+}
+
+.day-tasks {
+  max-height: 80px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-purple) transparent;
+}
+
+.day-tasks::-webkit-scrollbar {
+  width: 4px;
+}
+
+.day-tasks::-webkit-scrollbar-thumb {
+  background: var(--accent-purple);
+  border-radius: 2px;
+}

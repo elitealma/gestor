@@ -162,7 +162,7 @@
               <option value="progress">En Progreso</option>
               <option value="completed">Completados</option>
             </select>
-            <button class="btn btn-primary" id="btn-new-project">
+            <button class="btn btn-primary admin-only" id="btn-new-project">
               <span>➕</span>
               <span>Nuevo Proyecto</span>
             </button>
@@ -359,6 +359,13 @@
         <div class="form-group">
           <label class="form-label" for="task-date">Fecha de Vencimiento</label>
           <input type="date" id="task-date" class="form-input" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="task-assigned-user">Asignado a</label>
+          <select id="task-assigned-user" class="form-select">
+            <option value="">Sin asignar</option>
+          </select>
         </div>
 
         <div class="form-group">
