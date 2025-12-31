@@ -383,8 +383,18 @@ class AuthController {
     this.user = session?.user || null;
     this.updateUIState();
 
-    clientSB.auth.onAuthStateChange(async (_event, session) => {
+    // Detect password recovery state from URL hash
+    if (window.location.hash.includes('type=recovery')) {
+      document.getElementById('update-password-modal')?.classList.remove('hidden');
+    }
+
+    clientSB.auth.onAuthStateChange(async (event, session) => {
       this.user = session?.user || null;
+
+      if (event === 'PASSWORD_RECOVERY') {
+        document.getElementById('update-password-modal')?.classList.remove('hidden');
+      }
+
       this.updateUIState();
       await this.ui.dataManager.loadInitialData();
       this.updateUIState();
@@ -404,6 +414,18 @@ class AuthController {
 
   async logout() {
     await clientSB.auth.signOut();
+  }
+
+  async requestPasswordReset(email) {
+    const { error } = await clientSB.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) throw error;
+  }
+
+  async updatePassword(newPassword) {
+    const { error } = await clientSB.auth.updateUser({ password: newPassword });
+    if (error) throw error;
   }
 
   isAdmin() {
@@ -547,8 +569,62 @@ class UIController {
       this.currentDate = new Date();
       this.renderCalendar();
     });
+    // Forgot Password & Recovery Flow
+    document.getElementById('btn-forgot-password')?.addEventListener('click', () => {
+      this.closeAuthModal();
+      document.getElementById('forgot-password-modal')?.classList.remove('hidden');
+    });
+
+    document.getElementById('close-forgot-modal')?.addEventListener('click', () => {
+      document.getElementById('forgot-password-modal')?.classList.add('hidden');
+    });
+
+    document.getElementById('forgot-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('forgot-email').value;
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Enviando...';
+
+      try {
+        await auth.requestPasswordReset(email);
+        alert('Se ha enviado un correo de recuperación a ' + email);
+        document.getElementById('forgot-password-modal').classList.add('hidden');
+      } catch (error) {
+        alert('Error: ' + error.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Enviar Enlace';
+      }
+    });
+
+    document.getElementById('update-password-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const newPassword = document.getElementById('new-password').value;
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Actualizando...';
+
+      try {
+        await auth.updatePassword(newPassword);
+        alert('✅ Contraseña actualizada exitosamente. Ya puedes ingresar.');
+        document.getElementById('update-password-modal').classList.add('hidden');
+        window.location.hash = ''; // Clear recovery hash
+        this.openAuthModal();
+      } catch (error) {
+        alert('❌ Error: ' + error.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Cambiar Contraseña';
+      }
+    });
 
     // Close modals on overlay click
+    document.getElementById('forgot-password-modal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'forgot-password-modal') e.target.classList.add('hidden');
+    });
     document.getElementById('project-modal').addEventListener('click', (e) => {
       if (e.target.id === 'project-modal') this.closeProjectModal();
     });
