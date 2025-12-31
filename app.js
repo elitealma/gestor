@@ -1493,6 +1493,9 @@ ui.renderUsersView = async function () {
             <span>📅 Desde: ${new Date(user.created_at).toLocaleDateString()}</span>
           </div>
         </div>
+        <div class="task-actions admin-only">
+          <button class="btn-icon btn-secondary" onclick="ui.editUser('${user.id}')" title="Editar usuario">✏️</button>
+        </div>
       </div>
     `).join('');
 
@@ -1574,6 +1577,7 @@ const createUserWithUsername = async (username, password, role, areaId) => {
 document.getElementById('user-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
 
+  const userId = document.getElementById('user-id').value;
   const username = document.getElementById('user-username').value;
   const password = document.getElementById('user-password').value;
   const role = document.getElementById('user-role').value;
@@ -1581,16 +1585,27 @@ document.getElementById('user-form')?.addEventListener('submit', async (e) => {
 
   const submitBtn = e.target.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Creando...';
+  submitBtn.textContent = userId ? 'Actualizando...' : 'Creando...';
 
   try {
-    await createUserWithUsername(username, password, role, areaId);
-    alert('✅ Usuario creado exitosamente');
+    if (userId) {
+      // Update existing profile
+      const updateData = { username, role, area_id: areaId };
+      const { error } = await clientSB.from('profiles').update(updateData).eq('id', userId);
+      if (error) throw error;
+      alert('✅ Usuario actualizado exitosamente');
+    } else {
+      // Create new user
+      if (!password) throw new Error('Se requiere contraseña para nuevos usuarios');
+      await createUserWithUsername(username, password, role, areaId);
+      alert('✅ Usuario creado exitosamente');
+    }
+
     document.getElementById('user-modal').classList.add('hidden');
     e.target.reset();
     ui.renderUsersView();
   } catch (error) {
-    alert('❌ Error al crear usuario: ' + error.message);
+    alert('❌ Error: ' + error.message);
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Crear Usuario';
@@ -1599,6 +1614,16 @@ document.getElementById('user-form')?.addEventListener('submit', async (e) => {
 
 // Helper to open User Creator Modal
 ui.openCreateUserModal = function () {
+  const modal = document.getElementById('user-modal');
+  const form = document.getElementById('user-form');
+  const title = document.getElementById('user-modal-title');
+  const submitText = document.getElementById('user-submit-text');
+
+  if (form) form.reset();
+  document.getElementById('user-id').value = '';
+  if (title) title.textContent = 'Crear Usuario';
+  if (submitText) submitText.textContent = 'Crear Usuario';
+
   // Populate areas dropdown
   const selectArea = document.getElementById('user-area');
   if (selectArea) {
@@ -1622,7 +1647,28 @@ ui.openCreateUserModal = function () {
     document.getElementById('user-area-group')?.classList.remove('hidden');
   }
 
-  document.getElementById('user-modal')?.classList.remove('hidden');
+  modal?.classList.remove('hidden');
+};
+
+// Edit User Helper
+ui.editUser = async function (id) {
+  const { data: user, error } = await clientSB
+    .from('profiles')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error || !user) return alert('No se pudo encontrar el usuario');
+
+  this.openCreateUserModal(); // Initial setup
+
+  document.getElementById('user-modal-title').textContent = 'Editar Usuario';
+  document.getElementById('user-submit-text').textContent = 'Guardar Cambios';
+  document.getElementById('user-id').value = user.id;
+  document.getElementById('user-username').value = user.username || '';
+  document.getElementById('user-password').required = false;
+  document.getElementById('user-role').value = user.role;
+  document.getElementById('user-area').value = user.area_id || '';
 };
 
 // Cleanup old tab listeners and unused setup
