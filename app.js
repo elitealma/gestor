@@ -1214,8 +1214,8 @@ class UIController {
     const password = document.getElementById('auth-password').value;
     const submitBtn = e.target.querySelector('button[type="submit"]');
 
-    // Username support: append @gestor.local if not an email
-    const email = input.includes('@') ? input : `${input}@gestor.local`;
+    // Username support: append @gestor-almaia.com if not an email
+    const email = input.includes('@') ? input : `${input}@gestor-almaia.com`;
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Procesando...';
@@ -1663,7 +1663,7 @@ document.getElementById('area-form')?.addEventListener('submit', async (e) => {
 // User Management - Create user with username/password (admin only)
 const createUserWithUsername = async (username, password, role, areaId) => {
   try {
-    const email = `${username}@gestor.local`;
+    const email = `${username}@gestor-almaia.com`;
 
     // 1. Create user in Supabase Auth
     const { data: authData, error: authError } = await clientSB.auth.signUp({

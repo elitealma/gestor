@@ -32,6 +32,11 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE tablename = 'profiles' AND indexname = 'profiles_username_unique') THEN
         CREATE UNIQUE INDEX profiles_username_unique ON profiles(username) WHERE username IS NOT NULL;
     END IF;
+
+    -- Añadir columna slug a la tabla areas si falta
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='areas' AND column_name='slug') THEN
+        ALTER TABLE areas ADD COLUMN slug TEXT;
+    END IF;
 END $$;
 
 -- =============================================================================
