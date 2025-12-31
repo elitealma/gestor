@@ -1302,3 +1302,126 @@ body::before {
 }
 
 console.log(" Estilos del modal de calendario cargados");
+
+/* ===== PARTE 2: SETTINGS TABS ===== */
+
+/* Settings Tabs Navigation */
+.settings-tabs {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xl);
+  border-bottom: 2px solid var(--border-color);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.settings-tab {
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--font-size-base);
+  transition: all var(--transition-base);
+  font-family: var(--font-family);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.settings-tab:hover {
+  color: var(--text-primary);
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.settings-tab.active {
+  color: var(--accent-purple);
+  border-bottom-color: var(--accent-purple);
+  background: rgba(102, 126, 234, 0.1);
+}
+
+/* Settings Tab Content */
+.settings-tab-content {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.settings-tab-content h3 {
+  margin-bottom: var(--spacing-lg);
+  color: var(--text-primary);
+  font-size: var(--font-size-xl);
+}
+
+/* Settings Container Override */
+.settings-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* Management Lists */
+#areas-management-list,
+#users-management-list {
+  max-height: 500px;
+  overflow-y: auto;
+  margin-top: var(--spacing-lg);
+}
+
+/* Empty State in Settings */
+.settings-tab-content .empty-state {
+  padding: var(--spacing-2xl);
+}
+
+/* Badges for User Roles */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  margin-left: var(--spacing-sm);
+}
+
+.badge-completed {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.badge-progress {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.badge-pending {
+  background: rgba(156, 163, 175, 0.2);
+  color: #9ca3af;
+}
+
+/* Mobile Responsive for Settings Tabs */
+@media (max-width: 768px) {
+  .settings-tabs {
+    gap: var(--spacing-xs);
+  }
+  
+  .settings-tab {
+    font-size: var(--font-size-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+  
+  #areas-management-list,
+  #users-management-list {
+    max-height: 400px;
+  }
+}
+
+console.log(" Estilos de settings tabs cargados");

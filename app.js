@@ -1303,3 +1303,242 @@ ui.createCalendarDay = function(day, month, year, isOtherMonth = false) {
 };
 
 console.log(' Parte 1: Modal de calendario cargado');
+
+// ===== PARTE 2: TABS EN SETTINGS =====
+
+// Setup Settings Tabs
+ui.setupSettingsTabs = function() {
+  const profile = this.dataManager.profile;
+  
+  // Show/hide tabs based on role
+  if (profile?.role === 'super_admin') {
+    document.getElementById('tab-areas-btn')?.classList.remove('hidden');
+    document.getElementById('tab-users-btn')?.classList.remove('hidden');
+  } else if (profile?.role === 'area_leader') {
+    document.getElementById('tab-users-btn')?.classList.remove('hidden');
+  }
+
+  // Tab switching
+  document.querySelectorAll('.settings-tab').forEach(tab => {
+    tab.onclick = (e) => {
+      const tabName = e.target.dataset.tab;
+      if (!tabName) return;
+      
+      // Update active tab
+      document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+      e.target.classList.add('active');
+      
+      // Show corresponding content
+      document.querySelectorAll('.settings-tab-content').forEach(content => {
+        content.classList.add('hidden');
+      });
+      document.getElementById(`tab-${tabName}`)?.classList.remove('hidden');
+      
+      // Load data for tab
+      if (tabName === 'areas') {
+        this.renderAreasManagement();
+      } else if (tabName === 'users') {
+        this.renderUsersManagement();
+      } else if (tabName === 'profile') {
+        this.loadProfileData();
+      }
+    };
+  });
+};
+
+// Load profile data
+ui.loadProfileData = function() {
+  const profile = this.dataManager.profile;
+  if (!profile) return;
+  
+  const usernameInput = document.getElementById('settings-username');
+  const emailInput = document.getElementById('settings-email');
+  
+  if (usernameInput) usernameInput.value = profile.username || profile.email?.split('@')[0] || 'usuario';
+  if (emailInput) emailInput.value = profile.email || '';
+};
+
+// Render Areas Management
+ui.renderAreasManagement = async function() {
+  const container = document.getElementById('areas-management-list');
+  if (!container) return;
+  
+  try {
+    const { data: areas, error } = await clientSB
+      .from('areas')
+      .select('*')
+      .order('name');
+    
+    if (error) throw error;
+    
+    if (!areas || areas.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><p>No hay áreas creadas</p></div>';
+      return;
+    }
+
+    container.innerHTML = areas.map(area => `
+      <div class="task-item">
+        <div class="task-content">
+          <div class="task-title">${this.escapeHtml(area.name)}</div>
+          <div class="task-meta">
+            <span>ID: ${this.escapeHtml(area.slug)}</span>
+            <span>Creada: ${new Date(area.created_at).toLocaleDateString('es-ES')}</span>
+          </div>
+        </div>
+        <div class="task-actions admin-only">
+          <button class="btn-icon btn-secondary" onclick="ui.editArea('${area.id}')" title="Editar área"></button>
+        </div>
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error('Error loading areas:', error);
+    container.innerHTML = '<div class="empty-state"><p>Error al cargar áreas</p></div>';
+  }
+};
+
+// Render Users Management
+ui.renderUsersManagement = async function() {
+  const container = document.getElementById('users-management-list');
+  if (!container) return;
+  
+  try {
+    let query = clientSB
+      .from('profiles')
+      .select('*, areas(name)')
+      .order('created_at', { ascending: false });
+    
+    // Area leaders only see their area users
+    const profile = this.dataManager.profile;
+    if (profile?.role === 'area_leader' && profile?.area_id) {
+      query = query.eq('area_id', profile.area_id);
+    }
+    
+    const { data: users, error } = await query;
+    
+    if (error) throw error;
+    
+    if (!users || users.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><p>No hay usuarios</p></div>';
+      return;
+    }
+
+    const roleColors = {
+      'super_admin': 'completed',
+      'area_leader': 'progress',
+      'viewer': 'pending',
+      'user': 'pending'
+    };
+    
+    const roleNames = {
+      'super_admin': 'Super Admin',
+      'area_leader': 'Líder de Área',
+      'viewer': 'Viewer',
+      'user': 'Usuario'
+    };
+
+    container.innerHTML = users.map(user => `
+      <div class="task-item">
+        <div class="task-content">
+          <div class="task-title">
+            ${this.escapeHtml(user.username || user.email || 'Sin nombre')}
+            <span class="badge badge-${roleColors[user.role] || 'pending'}">${roleNames[user.role] || user.role}</span>
+          </div>
+          <div class="task-meta">
+            <span> ${user.email || 'Sin email'}</span>
+            ${user.areas ? `<span> ${this.escapeHtml(user.areas.name)}</span>` : '<span>Sin área</span>'}
+          </div>
+        </div>
+        <div class="task-actions editor-only">
+          <button class="btn-icon btn-secondary" title="Ver detalles"></button>
+        </div>
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error('Error loading users:', error);
+    container.innerHTML = '<div class="empty-state"><p>Error al cargar usuarios</p></div>';
+  }
+};
+
+// Area Modal Handlers
+document.getElementById('btn-new-area')?.addEventListener('click', () => {
+  document.getElementById('area-modal')?.classList.remove('hidden');
+  document.getElementById('area-name').value = '';
+  document.getElementById('area-slug').value = '';
+});
+
+document.getElementById('close-area-modal')?.addEventListener('click', () => {
+  document.getElementById('area-modal')?.classList.add('hidden');
+});
+
+document.getElementById('cancel-area')?.addEventListener('click', () => {
+  document.getElementById('area-modal')?.classList.add('hidden');
+});
+
+document.getElementById('area-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const name = document.getElementById('area-name').value;
+  const slug = document.getElementById('area-slug').value;
+  
+  try {
+    const { error } = await clientSB
+      .from('areas')
+      .insert([{ name, slug }]);
+    
+    if (error) throw error;
+    
+    alert(' Área creada exitosamente');
+    document.getElementById('area-modal').classList.add('hidden');
+    ui.renderAreasManagement();
+  } catch (error) {
+    alert(' Error al crear área: ' + error.message);
+  }
+});
+
+// User Modal Handlers
+document.getElementById('btn-new-user')?.addEventListener('click', () => {
+  // Populate areas dropdown
+  const selectArea = document.getElementById('user-area');
+  if (selectArea) {
+    clientSB.from('areas').select('*').order('name').then(({ data }) => {
+      selectArea.innerHTML = '<option value="">Sin área</option>' + 
+        (data || []).map(area => `<option value="${area.id}">${area.name}</option>`).join('');
+    });
+  }
+  
+  // Show/hide role selector for area leaders
+  const profile = dataManager.profile;
+  if (profile?.role === 'area_leader') {
+    document.getElementById('user-role').value = 'user';
+    document.getElementById('user-role-group')?.classList.add('hidden');
+    if (profile.area_id) {
+      document.getElementById('user-area').value = profile.area_id;
+      document.getElementById('user-area-group')?.classList.add('hidden');
+    }
+  } else {
+    document.getElementById('user-role-group')?.classList.remove('hidden');
+    document.getElementById('user-area-group')?.classList.remove('hidden');
+  }
+  
+  document.getElementById('user-modal')?.classList.remove('hidden');
+});
+
+document.getElementById('close-user-modal')?.addEventListener('click', () => {
+  document.getElementById('user-modal')?.classList.add('hidden');
+});
+
+document.getElementById('cancel-user')?.addEventListener('click', () => {
+  document.getElementById('user-modal')?.classList.add('hidden');
+});
+
+// Initialize tabs when navigating to settings
+const originalNavigateTo = ui.navigateTo.bind(ui);
+ui.navigateTo = function(view) {
+  originalNavigateTo(view);
+  if (view === 'settings') {
+    this.setupSettingsTabs();
+    this.loadProfileData();
+  }
+};
+
+console.log(' Parte 2: Settings tabs cargado');
