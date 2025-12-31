@@ -204,6 +204,15 @@ CREATE POLICY "Areas Write Admin" ON areas FOR ALL USING (
 CREATE POLICY "Profiles Read All" ON profiles FOR SELECT USING (true);
 CREATE POLICY "Profiles Update Self" ON profiles FOR UPDATE USING (auth.uid() = id);
 
+-- Escritura: Super Admin puede gestionar todos los perfiles
+CREATE POLICY "Profiles Admin All" ON profiles FOR ALL
+USING (
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'super_admin')
+)
+WITH CHECK (
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'super_admin')
+);
+
 -- NOTA: El rol 'admin' (global viewer) no tiene políticas de escritura (FOR ALL, INSERT, UPDATE, DELETE),
 -- por lo cual heredará solo el acceso de lectura definido en "Read All".
 
