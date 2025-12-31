@@ -383,9 +383,14 @@ class AuthController {
     this.user = session?.user || null;
     this.updateUIState();
 
-    // Detect password recovery state from URL hash
-    if (window.location.hash.includes('type=recovery')) {
-      document.getElementById('update-password-modal')?.classList.remove('hidden');
+    // Aggressive detection of password recovery state
+    const isRecovery = window.location.hash.includes('type=recovery') ||
+      window.location.search.includes('type=recovery');
+
+    if (isRecovery) {
+      setTimeout(() => {
+        document.getElementById('update-password-modal')?.classList.remove('hidden');
+      }, 500); // Small delay to ensure DOM is fully ready and stable
     }
 
     clientSB.auth.onAuthStateChange(async (event, session) => {
@@ -503,6 +508,10 @@ class UIController {
   }
 
   init() {
+    // Redundant check for password recovery
+    if (window.location.hash.includes('type=recovery')) {
+      document.getElementById('update-password-modal')?.classList.remove('hidden');
+    }
     this.currentDate = new Date();
     this.setupEventListeners();
     this.dataManager.loadInitialData().then(() => {
