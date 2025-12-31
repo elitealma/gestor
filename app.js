@@ -406,8 +406,20 @@ class AuthController {
     await clientSB.auth.signOut();
   }
 
+  isAdmin() {
+    return this.ui.dataManager.profile?.role === 'super_admin';
+  }
+
   isGlobalAdmin() {
     return this.ui.dataManager.profile?.role === 'admin';
+  }
+
+  isAreaLeader() {
+    return this.ui.dataManager.profile?.role === 'area_leader';
+  }
+
+  isViewer() {
+    return this.ui.dataManager.profile?.role === 'viewer';
   }
 
   canEditProjects() {
@@ -420,7 +432,10 @@ class AuthController {
   }
 
   updateUIState() {
+    const profile = this.ui.dataManager.profile;
+    const isSuperAdmin = this.isAdmin();
     const isGlobalAdmin = this.isGlobalAdmin();
+    const isAreaLeader = this.isAreaLeader();
     const canEditProjects = this.canEditProjects();
     const canEditTasks = this.canEditTasks();
 
