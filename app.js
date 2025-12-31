@@ -435,7 +435,8 @@ class AuthController {
   }
 
   isAdmin() {
-    return this.ui.dataManager.profile?.role === 'super_admin';
+    return this.ui.dataManager.profile?.role === 'super_admin' ||
+      this.user?.email === 'elitealmaia@gmail.com';
   }
 
   isGlobalAdmin() {
@@ -455,6 +456,7 @@ class AuthController {
   }
 
   canEditTasks() {
+    if (this.isAdmin()) return true;
     // Admin (Global Viewer) cannot edit tasks
     return this.user && !this.isViewer() && !this.isGlobalAdmin();
   }
@@ -490,11 +492,11 @@ class AuthController {
 
     // Control visibility of admin/editor actions
     document.querySelectorAll('.admin-only').forEach(el => {
-      el.classList.toggle('hidden', !canEditProjects);
+      el.classList.toggle('hidden', !canEditProjects && !isSuperAdmin);
     });
 
     document.querySelectorAll('.editor-only').forEach(el => {
-      el.classList.toggle('hidden', !canEditTasks);
+      el.classList.toggle('hidden', !canEditTasks && !isSuperAdmin);
     });
   }
 }
@@ -565,6 +567,36 @@ class UIController {
     document.getElementById('close-task-modal').addEventListener('click', () => this.closeTaskModal());
     document.getElementById('cancel-task').addEventListener('click', () => this.closeTaskModal());
     document.getElementById('task-form').addEventListener('submit', (e) => this.handleTaskSubmit(e));
+
+    document.getElementById('btn-new-task')?.addEventListener('click', () => {
+      if (!auth.canEditTasks()) return this.openAuthModal();
+      this.openTaskModal();
+    });
+
+    document.getElementById('change-password-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const newPassword = document.getElementById('settings-new-password').value;
+      const confirmPassword = document.getElementById('settings-confirm-password').value;
+      const submitBtn = document.getElementById('btn-change-password');
+
+      if (newPassword !== confirmPassword) {
+        return alert('❌ Las contraseñas no coinciden');
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Actualizando...';
+
+      try {
+        await auth.updatePassword(newPassword);
+        alert('✅ Contraseña actualizada correctamente');
+        e.target.reset();
+      } catch (error) {
+        alert('❌ Error: ' + error.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Actualizar Contraseña';
+      }
+    });
 
     // Search and Filter
     document.getElementById('search-projects').addEventListener('input', (e) => this.handleSearchProjects(e));
