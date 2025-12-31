@@ -424,3 +424,84 @@
 </body>
 
 </html>
+  <!-- Day Tasks Modal -->
+  <div id="day-tasks-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title text-primary" id="day-tasks-title">Tareas del Día</h2>
+        <button class="modal-close" id="close-day-tasks"></button>
+      </div>
+      <div id="day-tasks-list" class="tasks-list"></div>
+      <div class="form-actions">
+        <button class="btn btn-primary editor-only" id="btn-add-task-from-day">
+          <span></span>
+          <span>Nueva Tarea</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Management Modal -->
+  <div id="user-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="user-modal-title">Crear Usuario</h2>
+        <button class="modal-close" id="close-user-modal"></button>
+      </div>
+      <form id="user-form">
+        <div class="form-group">
+          <label class="form-label" for="user-username">Nombre de Usuario</label>
+          <input type="text" id="user-username" class="form-input" placeholder="usuario123" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="user-password">Contraseña</label>
+          <input type="password" id="user-password" class="form-input" placeholder="" required>
+        </div>
+        <div class="form-group" id="user-role-group">
+          <label class="form-label" for="user-role">Rol</label>
+          <select id="user-role" class="form-select" required>
+            <option value="user">Usuario</option>
+            <option value="area_leader">Líder de Área</option>
+            <option value="viewer">Administrador (Solo Lectura)</option>
+          </select>
+        </div>
+        <div class="form-group" id="user-area-group">
+          <label class="form-label" for="user-area">Área</label>
+          <select id="user-area" class="form-select">
+            <option value="">Seleccionar área...</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="cancel-user">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Crear Usuario</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Area Management Modal -->
+  <div id="area-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="area-modal-title">Nueva Área</h2>
+        <button class="modal-close" id="close-area-modal"></button>
+      </div>
+      <form id="area-form">
+        <input type="hidden" id="area-id">
+        <div class="form-group">
+          <label class="form-label" for="area-name">Nombre del Área</label>
+          <input type="text" id="area-name" class="form-input" placeholder="Desarrollo" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="area-slug">Slug (identificador)</label>
+          <input type="text" id="area-slug" class="form-input" placeholder="desarrollo" required>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="cancel-area">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <span id="area-submit-text">Crear Área</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>

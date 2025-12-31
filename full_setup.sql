@@ -22,6 +22,16 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='assigned_to') THEN
         ALTER TABLE tasks ADD COLUMN assigned_to UUID REFERENCES auth.users(id) ON DELETE SET NULL;
     END IF;
+    
+    -- Asegurar que username existe y es único
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='username') THEN
+        ALTER TABLE profiles ADD COLUMN username TEXT;
+    END IF;
+    
+    -- Hacer username único si no lo es
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE tablename = 'profiles' AND indexname = 'profiles_username_unique') THEN
+        CREATE UNIQUE INDEX profiles_username_unique ON profiles(username) WHERE username IS NOT NULL;
+    END IF;
 END $$;
 
 -- =============================================================================

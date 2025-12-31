@@ -1,0 +1,60 @@
+﻿<!-- REEMPLAZAR Settings View completo con tabs -->
+<section id="settings-view" class="view hidden">
+  <div class="content-header">
+    <h1 class="content-title">Ajustes</h1>
+    <p class="content-subtitle">Gestiona tu perfil y el sistema</p>
+  </div>
+
+  <!-- Tabs Navigation -->
+  <div class="settings-tabs">
+    <button class="settings-tab" data-tab="profile"> Perfil</button>
+    <button class="settings-tab hidden" id="tab-areas" data-tab="areas"> Áreas</button>
+    <button class="settings-tab hidden" id="tab-users" data-tab="users"> Usuarios</button>
+  </div>
+
+  <!-- Tab: Profile -->
+  <div id="tab-profile" class="settings-tab-content card">
+    <h3>Información Personal</h3>
+    <form id="settings-form">
+      <div class="form-group">
+        <label class="form-label">Usuario</label>
+        <input type="text" id="settings-username" class="form-input" readonly>
+      </div>
+      <div class="form-group admin-only">
+        <label class="form-label">Email</label>
+        <input type="email" id="settings-email" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nueva Contraseña</label>
+        <input type="password" id="settings-new-password" class="form-input" placeholder="">
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Tab: Areas (Super Admin only) -->
+  <div id="tab-areas" class="settings-tab-content card hidden">
+    <div class="toolbar">
+      <h3>Gestión de Áreas</h3>
+      <button class="btn btn-primary" id="btn-new-area">
+        <span></span>
+        <span>Nueva Área</span>
+      </button>
+    </div>
+    <div id="areas-management-list" class="tasks-list"></div>
+  </div>
+
+  <!-- Tab: Users (Super Admin / Area Leader) -->
+  <div id="tab-users" class="settings-tab-content card hidden">
+    <div class="toolbar">
+      <h3>Gestión de Usuarios</h3>
+      <button class="btn btn-primary" id="btn-new-user">
+        <span></span>
+        <span>Crear Usuario</span>
+      </button>
+    </div>
+    <div id="users-management-list" class="tasks-list"></div>
+  </div>
+</section>

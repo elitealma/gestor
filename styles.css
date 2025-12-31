@@ -1243,3 +1243,62 @@ body::before {
   background: var(--accent-purple);
   border-radius: 2px;
 }
+
+/* ===== PARTE 1: MODAL DE CALENDARIO ===== */
+
+/* Day Tasks Modal */
+#day-tasks-modal .modal {
+  max-width: 700px;
+}
+
+#day-tasks-modal .modal-title {
+  font-size: var(--font-size-xl);
+  text-transform: capitalize;
+}
+
+#day-tasks-list {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: var(--spacing-lg);
+  min-height: 100px;
+}
+
+#day-tasks-list:empty::after {
+  content: "Cargando...";
+  display: block;
+  text-align: center;
+  color: var(--text-muted);
+  padding: var(--spacing-xl);
+}
+
+/* Calendar day hover effect */
+.calendar-day {
+  position: relative;
+}
+
+.calendar-day::after {
+  content: "Ver tareas";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(102, 126, 234, 0.95);
+  color: white;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base);
+  white-space: nowrap;
+}
+
+.calendar-day:hover::after {
+  opacity: 1;
+}
+
+.calendar-day.other-month:hover::after {
+  opacity: 0;
+}
+
+console.log(" Estilos del modal de calendario cargados");

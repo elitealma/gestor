@@ -1230,3 +1230,76 @@ ui.auth = auth;
   await auth.init(); // Load session first
   ui.init();         // Then load UI and listeners
 })();
+
+// ===== PARTE 1: MODAL DE CALENDARIO - TAREAS DEL DÍA =====
+
+// Función para abrir modal de tareas del día
+ui.openDayTasksModal = function(dateStr) {
+  const modal = document.getElementById('day-tasks-modal');
+  if (!modal) return;
+  
+  const title = document.getElementById('day-tasks-title');
+  const container = document.getElementById('day-tasks-list');
+  
+  const tasks = this.dataManager.getTasksByDate(dateStr);
+  const date = new Date(dateStr + 'T12:00:00');
+  const dateFormatted = date.toLocaleDateString('es-ES', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+  
+  title.textContent = `Tareas del ${dateFormatted}`;
+  
+  if (tasks.length === 0) {
+    container.innerHTML = '<div class="empty-state">No hay tareas para este día</div>';
+  } else {
+    container.innerHTML = tasks.map(task => this.renderTaskItem(task)).join('');
+  }
+  
+  modal.classList.remove('hidden');
+  modal.dataset.selectedDate = dateStr;
+};
+
+// Event listeners para modal de día
+document.getElementById('close-day-tasks')?.addEventListener('click', () => {
+  document.getElementById('day-tasks-modal')?.classList.add('hidden');
+});
+
+document.getElementById('btn-add-task-from-day')?.addEventListener('click', () => {
+  const modal = document.getElementById('day-tasks-modal');
+  const date = modal?.dataset.selectedDate;
+  if (modal) modal.classList.add('hidden');
+  if (date) {
+    ui.openTaskModal();
+    document.getElementById('task-date').value = date;
+  }
+});
+
+// Modificar createCalendarDay para agregar click handler
+const originalCreateCalendarDay = ui.createCalendarDay.bind(ui);
+ui.createCalendarDay = function(day, month, year, isOtherMonth = false) {
+  const dayEl = originalCreateCalendarDay(day, month, year, isOtherMonth);
+  const date = new Date(year, month, day);
+  const dateStr = formatDateYYYYMMDD(date);
+  
+  // Agregar data attribute para la fecha
+  dayEl.dataset.date = dateStr;
+  
+  // Modificar el click handler
+  const oldOnclick = dayEl.onclick;
+  dayEl.onclick = (e) => {
+    e.stopPropagation();
+    if (auth.user) {
+      this.openDayTasksModal(dateStr);
+    } else {
+      // Si es invitado, solo mostrar tareas sin poder crear
+      this.openDayTasksModal(dateStr);
+    }
+  };
+  
+  return dayEl;
+};
+
+console.log(' Parte 1: Modal de calendario cargado');
