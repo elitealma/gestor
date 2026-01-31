@@ -622,6 +622,8 @@ class UIController {
     document.getElementById('filter-projects-area')?.addEventListener('change', (e) => this.handleFilterProjectsArea(e));
     document.getElementById('search-tasks').addEventListener('input', (e) => this.handleSearchTasks(e));
     document.getElementById('filter-tasks').addEventListener('change', (e) => this.handleFilterTasks(e));
+    document.getElementById('filter-tasks-area')?.addEventListener('change', (e) => this.handleFilterTasksArea(e));
+    document.getElementById('filter-tasks-user')?.addEventListener('change', (e) => this.handleFilterTasksUser(e));
 
     // Date Filter for Tasks
     document.getElementById('filter-tasks-date')?.addEventListener('change', (e) => this.handleDateFilterTasks(e));
@@ -911,7 +913,7 @@ class UIController {
   }
 
   // Tasks Rendering
-  renderTasks(filter = 'all', search = '', dateFilter = 'all') {
+  renderTasks(filter = 'all', search = '', dateFilter = 'all', areaFilter = 'all', userFilter = 'all') {
     let tasks = this.dataManager.tasks;
 
     // Apply project filter if set
@@ -923,6 +925,16 @@ class UIController {
     // Apply status filter
     if (filter !== 'all') {
       tasks = tasks.filter(t => t.status === filter);
+    }
+
+    // Apply area filter
+    if (areaFilter !== 'all') {
+      tasks = tasks.filter(t => t.area_id === areaFilter);
+    }
+
+    // Apply user filter
+    if (userFilter !== 'all') {
+      tasks = tasks.filter(t => t.assignedTo === userFilter);
     }
 
     // Apply date filter
@@ -956,6 +968,26 @@ class UIController {
           tasks = tasks.filter(t => t.dueDate >= fromDate && t.dueDate <= toDate);
         }
       }
+    }
+
+    // Populate Area filter if empty
+    const areaFilterSelect = document.getElementById('filter-tasks-area');
+    if (areaFilterSelect && areaFilterSelect.options.length <= 1) {
+      if (this.dataManager.areas && this.dataManager.areas.length > 0) {
+        this.dataManager.areas.forEach(area => {
+          const opt = document.createElement('option');
+          opt.value = area.id;
+          opt.textContent = area.name;
+          opt.selected = area.id === areaFilter;
+          areaFilterSelect.appendChild(opt);
+        });
+      }
+    }
+
+    // Populate User filter if empty
+    const userFilterSelect = document.getElementById('filter-tasks-user');
+    if (userFilterSelect && userFilterSelect.options.length <= 1) {
+      this.populateUserFilter(userFilterSelect, userFilter);
     }
 
     // Apply search
@@ -1427,6 +1459,47 @@ class UIController {
     this.renderTasks(filter, search, 'custom');
   }
 
+  handleFilterTasksArea(e) {
+    const areaFilter = e.target.value;
+    const filter = document.getElementById('filter-tasks').value;
+    const search = document.getElementById('search-tasks').value;
+    const dateFilter = document.getElementById('filter-tasks-date')?.value || 'all';
+    const userFilter = document.getElementById('filter-tasks-user')?.value || 'all';
+    this.renderTasks(filter, search, dateFilter, areaFilter, userFilter);
+  }
+
+  handleFilterTasksUser(e) {
+    const userFilter = e.target.value;
+    const filter = document.getElementById('filter-tasks').value;
+    const search = document.getElementById('search-tasks').value;
+    const dateFilter = document.getElementById('filter-tasks-date')?.value || 'all';
+    const areaFilter = document.getElementById('filter-tasks-area')?.value || 'all';
+    this.renderTasks(filter, search, dateFilter, areaFilter, userFilter);
+  }
+
+  async populateUserFilter(selectElement, selectedValue) {
+    if (selectElement.options.length > 1) return;
+
+    try {
+      // Use DataManager profiles if possible, otherwise fetch
+      let profiles = [];
+      const { data, error } = await clientSB.from('profiles').select('id, username, email');
+      if (!error && data) {
+        profiles = data;
+      }
+
+      profiles.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = user.username || user.email?.split('@')[0] || 'Usuario';
+        option.selected = user.id === selectedValue;
+        selectElement.appendChild(option);
+      });
+    } catch (e) {
+      console.warn('Error populating user filter:', e);
+    }
+  }
+
   // Utilities
   refreshCurrentView() {
     const view = this.dataManager.currentView;
@@ -1441,7 +1514,9 @@ class UIController {
       const filter = document.getElementById('filter-tasks').value;
       const search = document.getElementById('search-tasks').value;
       const dateFilter = document.getElementById('filter-tasks-date')?.value || 'all';
-      this.renderTasks(filter, search, dateFilter);
+      const areaFilter = document.getElementById('filter-tasks-area')?.value || 'all';
+      const userFilter = document.getElementById('filter-tasks-user')?.value || 'all';
+      this.renderTasks(filter, search, dateFilter, areaFilter, userFilter);
     } else if (view === 'calendar') {
       this.renderCalendar();
     }
@@ -1737,8 +1812,8 @@ ui.renderUsersView = async function () {
   try {
     let query = clientSB
       .from('profiles')
-      .select('*, areas(name)')
-      .order('created_at', { ascending: false });
+      .select('*, areas(name)');
+    //.order('created_at', { ascending: false }); // Column might not exist
 
     // Global Roles see all. Area Leaders only see their area.
     const profile = this.dataManager.profile;
