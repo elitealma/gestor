@@ -613,6 +613,10 @@ class UIController {
     document.getElementById('search-tasks').addEventListener('input', (e) => this.handleSearchTasks(e));
     document.getElementById('filter-tasks').addEventListener('change', (e) => this.handleFilterTasks(e));
 
+    // Date Filter for Tasks
+    document.getElementById('filter-tasks-date')?.addEventListener('change', (e) => this.handleDateFilterTasks(e));
+    document.getElementById('apply-date-range')?.addEventListener('click', () => this.applyCustomDateRange());
+
     // Calendar Nav
     document.getElementById('prev-month').addEventListener('click', () => this.changeMonth(-1));
     document.getElementById('next-month').addEventListener('click', () => this.changeMonth(1));
@@ -860,7 +864,7 @@ class UIController {
   }
 
   // Tasks Rendering
-  renderTasks(filter = 'all', search = '') {
+  renderTasks(filter = 'all', search = '', dateFilter = 'all') {
     let tasks = this.dataManager.tasks;
 
     // Apply project filter if set
@@ -872,6 +876,39 @@ class UIController {
     // Apply status filter
     if (filter !== 'all') {
       tasks = tasks.filter(t => t.status === filter);
+    }
+
+    // Apply date filter
+    if (dateFilter && dateFilter !== 'all') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (dateFilter === 'today') {
+        const todayStr = formatDateYYYYMMDD(today);
+        tasks = tasks.filter(t => t.dueDate === todayStr);
+      } else if (dateFilter === 'week') {
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+        const startStr = formatDateYYYYMMDD(startOfWeek);
+        const endStr = formatDateYYYYMMDD(endOfWeek);
+        tasks = tasks.filter(t => t.dueDate >= startStr && t.dueDate <= endStr);
+      } else if (dateFilter === 'month') {
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+        const startStr = formatDateYYYYMMDD(startOfMonth);
+        const endStr = formatDateYYYYMMDD(endOfMonth);
+        tasks = tasks.filter(t => t.dueDate >= startStr && t.dueDate <= endStr);
+      } else if (dateFilter === 'custom') {
+        const fromDate = document.getElementById('filter-date-from')?.value;
+        const toDate = document.getElementById('filter-date-to')?.value;
+        if (fromDate && toDate) {
+          tasks = tasks.filter(t => t.dueDate >= fromDate && t.dueDate <= toDate);
+        }
+      }
     }
 
     // Apply search
@@ -1299,13 +1336,39 @@ class UIController {
   handleSearchTasks(e) {
     const search = e.target.value;
     const filter = document.getElementById('filter-tasks').value;
-    this.renderTasks(filter, search);
+    const dateFilter = document.getElementById('filter-tasks-date')?.value || 'all';
+    this.renderTasks(filter, search, dateFilter);
   }
 
   handleFilterTasks(e) {
     const filter = e.target.value;
     const search = document.getElementById('search-tasks').value;
-    this.renderTasks(filter, search);
+    const dateFilter = document.getElementById('filter-tasks-date')?.value || 'all';
+    this.renderTasks(filter, search, dateFilter);
+  }
+
+  handleDateFilterTasks(e) {
+    const dateFilter = e.target.value;
+    const container = document.getElementById('date-range-container');
+
+    // Show/hide date range inputs
+    if (dateFilter === 'custom') {
+      container.style.display = 'flex';
+      container.classList.remove('hidden');
+    } else {
+      container.style.display = 'none';
+      container.classList.add('hidden');
+    }
+
+    const filter = document.getElementById('filter-tasks').value;
+    const search = document.getElementById('search-tasks').value;
+    this.renderTasks(filter, search, dateFilter);
+  }
+
+  applyCustomDateRange() {
+    const filter = document.getElementById('filter-tasks').value;
+    const search = document.getElementById('search-tasks').value;
+    this.renderTasks(filter, search, 'custom');
   }
 
   // Utilities
@@ -1320,7 +1383,8 @@ class UIController {
     } else if (view === 'tasks') {
       const filter = document.getElementById('filter-tasks').value;
       const search = document.getElementById('search-tasks').value;
-      this.renderTasks(filter, search);
+      const dateFilter = document.getElementById('filter-tasks-date')?.value || 'all';
+      this.renderTasks(filter, search, dateFilter);
     } else if (view === 'calendar') {
       this.renderCalendar();
     }

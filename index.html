@@ -186,13 +186,26 @@
             <span class="search-icon">🔍</span>
             <input type="text" id="search-tasks" class="search-input" placeholder="Buscar tareas...">
           </div>
-          <div class="toolbar-actions">
+          <div class="toolbar-actions" style="flex-wrap: wrap; gap: 0.5rem;">
             <select id="filter-tasks" class="form-select">
               <option value="all">Todas las tareas</option>
               <option value="pending">Pendientes</option>
               <option value="progress">En Progreso</option>
               <option value="completed">Completadas</option>
             </select>
+            <select id="filter-tasks-date" class="form-select">
+              <option value="all">Todas las fechas</option>
+              <option value="today">Hoy</option>
+              <option value="week">Esta semana</option>
+              <option value="month">Este mes</option>
+              <option value="custom">Rango personalizado</option>
+            </select>
+            <div id="date-range-container" class="hidden" style="display: none; align-items: center; gap: 0.5rem;">
+              <input type="date" id="filter-date-from" class="form-input" style="width: auto;">
+              <span>a</span>
+              <input type="date" id="filter-date-to" class="form-input" style="width: auto;">
+              <button class="btn btn-secondary" id="apply-date-range">Aplicar</button>
+            </div>
             <button class="btn btn-primary editor-only" id="btn-new-task">
               <span>➕</span>
               <span>Nueva Tarea</span>
@@ -604,7 +617,7 @@
   </div>
 
   <!-- JavaScript -->
-  <script src="app.js?v=1.2.0"></script>
+  <script src="app.js?v=1.3.0"></script>
 </body>
 
 </html>
