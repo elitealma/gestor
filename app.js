@@ -576,10 +576,29 @@ class UIController {
     document.getElementById('btn-new-area-main')?.addEventListener('click', () => {
       document.getElementById('area-modal')?.classList.remove('hidden');
       document.getElementById('area-form').reset();
+      document.getElementById('area-id').value = '';
+      document.getElementById('area-modal-title').textContent = 'Nueva Área';
+      document.getElementById('area-submit-text').textContent = 'Crear Área';
     });
 
     document.getElementById('btn-new-user-main')?.addEventListener('click', () => {
-      this.openCreateUserModal(); // Wrapper for existing logic
+      this.openCreateUserModal();
+    });
+
+    // Close/Cancel User Modal
+    document.getElementById('close-user-modal')?.addEventListener('click', () => {
+      document.getElementById('user-modal')?.classList.add('hidden');
+    });
+    document.getElementById('cancel-user')?.addEventListener('click', () => {
+      document.getElementById('user-modal')?.classList.add('hidden');
+    });
+
+    // Close/Cancel Area Modal
+    document.getElementById('close-area-modal')?.addEventListener('click', () => {
+      document.getElementById('area-modal')?.classList.add('hidden');
+    });
+    document.getElementById('cancel-area')?.addEventListener('click', () => {
+      document.getElementById('area-modal')?.classList.add('hidden');
     });
     document.getElementById('close-project-modal').addEventListener('click', () => this.closeProjectModal());
     document.getElementById('cancel-project').addEventListener('click', () => this.closeProjectModal());
@@ -1785,7 +1804,8 @@ ui.renderAreasView = async function () {
         <div class="project-header">
           <h3 class="project-title">${this.escapeHtml(area.name)}</h3>
           <div class="project-actions admin-only">
-            <button class="btn-icon btn-secondary" onclick="ui.editArea('${area.id}')">✏️</button>
+            <button class="btn-icon btn-secondary" onclick="ui.editArea('${area.id}')" title="Editar área">✏️</button>
+            <button class="btn-icon btn-danger" onclick="ui.deleteArea('${area.id}')" title="Eliminar área">🗑️</button>
           </div>
         </div>
         <div class="project-meta">
@@ -1805,6 +1825,49 @@ ui.renderAreasView = async function () {
   } catch (error) {
     console.error('Error loading areas:', error);
     container.innerHTML = '<div class="empty-state">Error al cargar áreas</div>';
+  }
+};
+
+// Edit Area Helper
+ui.editArea = async function (id) {
+  try {
+    const { data: area, error } = await clientSB
+      .from('areas')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !area) throw new Error('No se pudo encontrar el área');
+
+    document.getElementById('area-modal')?.classList.remove('hidden');
+    document.getElementById('area-modal-title').textContent = 'Editar Área';
+    document.getElementById('area-submit-text').textContent = 'Guardar Cambios';
+    document.getElementById('area-id').value = area.id;
+    document.getElementById('area-name').value = area.name;
+    document.getElementById('area-slug').value = area.slug;
+  } catch (error) {
+    alert('❌ Error: ' + error.message);
+  }
+};
+
+// Delete Area Helper
+ui.deleteArea = async function (id) {
+  if (!confirm('¿Estás seguro de que deseas eliminar esta área? Esta acción no se puede deshacer.')) return;
+
+  try {
+    const { error } = await clientSB
+      .from('areas')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    alert('✅ Área eliminada exitosamente');
+    ui.renderAreasView();
+    // Also refresh data manager to update filters
+    ui.dataManager.init();
+  } catch (error) {
+    alert('❌ Error al eliminar el área: ' + error.message);
   }
 };
 
@@ -1878,39 +1941,36 @@ ui.renderUsersView = async function () {
   }
 };
 
-// Area Modal Handlers
+// Area Modal Handlers - These are now handled in UIController setupEventListeners
+/*
 document.getElementById('btn-new-area')?.addEventListener('click', () => {
-  document.getElementById('area-modal')?.classList.remove('hidden');
-  document.getElementById('area-name').value = '';
-  document.getElementById('area-slug').value = '';
-});
-
-document.getElementById('close-area-modal')?.addEventListener('click', () => {
-  document.getElementById('area-modal')?.classList.add('hidden');
-});
-
-document.getElementById('cancel-area')?.addEventListener('click', () => {
-  document.getElementById('area-modal')?.classList.add('hidden');
-});
+...
+*/
 
 document.getElementById('area-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
 
+  const id = document.getElementById('area-id').value;
   const name = document.getElementById('area-name').value;
   const slug = document.getElementById('area-slug').value;
 
   try {
+    const areaData = { name, slug };
+    if (id) areaData.id = id;
+
     const { error } = await clientSB
       .from('areas')
-      .insert([{ name, slug }]);
+      .upsert(areaData);
 
     if (error) throw error;
 
-    alert(' Área creada exitosamente');
+    alert(id ? '✅ Área actualizada exitosamente' : '✅ Área creada exitosamente');
     document.getElementById('area-modal').classList.add('hidden');
     ui.renderAreasView();
+    // Refresh data manager to update filters
+    ui.dataManager.init();
   } catch (error) {
-    alert(' Error al crear área: ' + error.message);
+    alert('❌ Error: ' + error.message);
   }
 });
 

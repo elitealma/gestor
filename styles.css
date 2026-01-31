@@ -420,6 +420,29 @@ body::before {
   border-color: var(--accent-purple);
 }
 
+.btn-danger {
+  background: rgba(245, 87, 108, 0.2);
+  color: #f5576c;
+  border: 1px solid #f5576c;
+}
+
+.btn-danger:hover {
+  background: #f5576c;
+  color: white;
+  box-shadow: 0 0 15px rgba(245, 87, 108, 0.4);
+}
+
+.btn-warning {
+  background: rgba(251, 191, 36, 0.2);
+  color: var(--status-pending);
+  border: 1px solid var(--status-pending);
+}
+
+.btn-warning:hover {
+  background: var(--status-pending);
+  color: black;
+}
+
 .btn-icon {
   padding: var(--spacing-md);
   aspect-ratio: 1;
@@ -1361,7 +1384,7 @@ body::before {
   opacity: 0;
 }
 
-console.log(" Estilos del modal de calendario cargados");
+/* Estilos del modal de calendario cargados */
 
 /* ===== PARTE 2: SETTINGS TABS ===== */
 
