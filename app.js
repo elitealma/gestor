@@ -56,7 +56,7 @@ class DataManager {
 
       this.profile = profile || null;
 
-      let projectsQuery = clientSB.from('projects').select('*').order('created_at', { ascending: false });
+      let projectsQuery = clientSB.from('projects').select('*, areas(name)').order('created_at', { ascending: false });
       let tasksQuery = clientSB.from('tasks').select('*').order('created_at', { ascending: false });
 
       /* 
@@ -610,6 +610,7 @@ class UIController {
     // Search and Filter
     document.getElementById('search-projects').addEventListener('input', (e) => this.handleSearchProjects(e));
     document.getElementById('filter-projects').addEventListener('change', (e) => this.handleFilterProjects(e));
+    document.getElementById('filter-projects-area')?.addEventListener('change', (e) => this.handleFilterProjectsArea(e));
     document.getElementById('search-tasks').addEventListener('input', (e) => this.handleSearchTasks(e));
     document.getElementById('filter-tasks').addEventListener('change', (e) => this.handleFilterTasks(e));
 
@@ -782,10 +783,15 @@ class UIController {
   }
 
   // Projects Rendering
-  renderProjects(filter = 'all', search = '') {
+  renderProjects(filter = 'all', search = '', areaFilter = 'all') {
     let projects = this.dataManager.projects;
 
-    // Apply filter
+    // Apply Area Filter
+    if (areaFilter !== 'all') {
+      projects = projects.filter(p => p.area_id === areaFilter);
+    }
+
+    // Apply Status Filter
     if (filter !== 'all') {
       projects = projects.filter(p => p.status === filter);
     }
@@ -794,8 +800,29 @@ class UIController {
     if (search) {
       projects = projects.filter(p =>
         p.name.toLowerCase().includes(search.toLowerCase()) ||
-        p.description.toLowerCase().includes(search.toLowerCase())
+        (p.description && p.description.toLowerCase().includes(search.toLowerCase()))
       );
+    }
+
+    // Populate Area Filter Dropdown (if empty or needs update)
+    const areaSelect = document.getElementById('filter-projects-area');
+    if (areaSelect && areaSelect.options.length <= 1) {
+      // Get unique areas from projects or use fetched areas if available
+      const uniqueAreas = new Map();
+      // Prefer fetching from areas table if we had it, but we can extract from projects for now
+      this.dataManager.projects.forEach(p => {
+        if (p.areas) {
+          uniqueAreas.set(p.area_id, p.areas.name);
+        }
+      });
+
+      uniqueAreas.forEach((name, id) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = name;
+        option.selected = id === areaFilter;
+        areaSelect.appendChild(option);
+      });
     }
 
     const container = document.getElementById('projects-list');
@@ -849,6 +876,7 @@ class UIController {
             </div>
           </div>
           <div class="project-stats">
+            ${project.areas ? `<div class="project-stat"><span>🏢</span><span>${this.escapeHtml(project.areas.name)}</span></div>` : ''}
             <div class="project-stat">
               <span>📋</span>
               <span>${tasks.length} tareas</span>
@@ -961,7 +989,7 @@ class UIController {
           <div class="task-meta">
             <span>📁 ${project ? this.escapeHtml(project.name) : 'Sin proyecto'}</span>
             <span>📅 ${task.dueDate}</span>
-            ${assignedUser ? `<span>👤 ${this.escapeHtml(assignedUser.email || assignedUser.username || 'Usuario')}</span>` : ''}
+            ${assignedUser ? `<span>👤 ${this.escapeHtml(assignedUser.username || assignedUser.email?.split('@')[0] || 'Usuario')}</span>` : ''}
             ${statusBadge}
           </div>
         </div>
@@ -1324,13 +1352,22 @@ class UIController {
   handleSearchProjects(e) {
     const search = e.target.value;
     const filter = document.getElementById('filter-projects').value;
-    this.renderProjects(filter, search);
+    const areaFilter = document.getElementById('filter-projects-area')?.value || 'all';
+    this.renderProjects(filter, search, areaFilter);
   }
 
   handleFilterProjects(e) {
     const filter = e.target.value;
     const search = document.getElementById('search-projects').value;
-    this.renderProjects(filter, search);
+    const areaFilter = document.getElementById('filter-projects-area')?.value || 'all';
+    this.renderProjects(filter, search, areaFilter);
+  }
+
+  handleFilterProjectsArea(e) {
+    const areaFilter = e.target.value;
+    const filter = document.getElementById('filter-projects').value;
+    const search = document.getElementById('search-projects').value;
+    this.renderProjects(filter, search, areaFilter);
   }
 
   handleSearchTasks(e) {
@@ -1379,7 +1416,8 @@ class UIController {
     } else if (view === 'projects') {
       const filter = document.getElementById('filter-projects').value;
       const search = document.getElementById('search-projects').value;
-      this.renderProjects(filter, search);
+      const areaFilter = document.getElementById('filter-projects-area')?.value || 'all';
+      this.renderProjects(filter, search, areaFilter);
     } else if (view === 'tasks') {
       const filter = document.getElementById('filter-tasks').value;
       const search = document.getElementById('search-tasks').value;
@@ -1717,12 +1755,11 @@ ui.renderUsersView = async function () {
       <div class="task-item">
         <div class="task-content">
           <div class="task-title">
-            ${this.escapeHtml(user.username || user.email || 'Sin nombre')}
+            👤 ${this.escapeHtml(user.username || user.email?.split('@')[0] || 'Sin nombre')}
             <span class="badge badge-${roleColors[user.role] || 'pending'}">${roleNames[user.role] || user.role}</span>
           </div>
           <div class="task-meta">
-            <span>📧 ${user.email || 'Sin email'}</span>
-            ${user.areas ? `<span>🏢 ${this.escapeHtml(user.areas.name)}</span>` : '<span>🌐 Sin área asignada</span>'}
+            ${user.areas ? `<span>🏢 Área: <strong>${this.escapeHtml(user.areas.name)}</strong></span>` : '<span>🌐 Sin área asignada</span>'}
             <span>📅 Desde: ${new Date(user.created_at).toLocaleDateString()}</span>
           </div>
         </div>
