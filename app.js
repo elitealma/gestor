@@ -63,7 +63,7 @@ class DataManager {
       // Filter logic: Local users only see their area. 
       // Super Admin and Global Admin (read-only) see EVERYTHING.
       */
-      const isGlobalPower = this.profile?.role === 'super_admin' || this.profile?.role === 'admin';
+      const isGlobalPower = this.profile?.role === 'super_admin' || this.profile?.role === 'super_manager' || this.profile?.role === 'admin';
 
       if (this.profile && !isGlobalPower) {
         projectsQuery = projectsQuery.eq('area_id', this.profile.area_id);
@@ -457,6 +457,10 @@ class AuthController {
       this.user?.email === 'elitealmaia@gmail.com';
   }
 
+  isSuperManager() {
+    return this.ui.dataManager.profile?.role === 'super_manager';
+  }
+
   isGlobalAdmin() {
     return this.ui.dataManager.profile?.role === 'admin';
   }
@@ -470,11 +474,11 @@ class AuthController {
   }
 
   canEditProjects() {
-    return this.isAdmin() || this.isAreaLeader();
+    return this.isAdmin() || this.isSuperManager() || this.isAreaLeader();
   }
 
   canEditTasks() {
-    if (this.isAdmin()) return true;
+    if (this.isAdmin() || this.isSuperManager()) return true;
     // Admin (Global Viewer) cannot edit tasks
     return this.user && !this.isViewer() && !this.isGlobalAdmin();
   }
@@ -493,8 +497,8 @@ class AuthController {
     document.getElementById('nav-settings').classList.toggle('hidden', !this.user);
 
     // Sidebar navigation visibility
-    const canSeeAreas = isSuperAdmin || isGlobalAdmin;
-    const canSeeUsers = isSuperAdmin || isGlobalAdmin || isAreaLeader;
+    const canSeeAreas = isSuperAdmin || isGlobalAdmin || auth.isSuperManager();
+    const canSeeUsers = isSuperAdmin || isGlobalAdmin || isAreaLeader || auth.isSuperManager();
 
     document.getElementById('nav-areas').classList.toggle('hidden', !canSeeAreas);
     document.getElementById('nav-users').classList.toggle('hidden', !canSeeUsers);
@@ -1817,7 +1821,7 @@ ui.renderUsersView = async function () {
 
     // Global Roles see all. Area Leaders only see their area.
     const profile = this.dataManager.profile;
-    const isGlobal = profile?.role === 'super_admin' || profile?.role === 'admin';
+    const isGlobal = profile?.role === 'super_admin' || profile?.role === 'super_manager' || profile?.role === 'admin';
 
     if (profile?.role === 'area_leader' && !isGlobal) {
       query = query.eq('area_id', profile.area_id);
@@ -1833,13 +1837,15 @@ ui.renderUsersView = async function () {
 
     const roleColors = {
       'super_admin': 'completed',
+      'super_manager': 'progress',
       'admin': 'progress',
       'area_leader': 'progress',
       'user': 'pending'
     };
 
     const roleNames = {
-      'super_admin': 'Super Admin',
+      'super_admin': 'Super Administrador',
+      'super_manager': 'Administrador de Roles',
       'admin': 'Admin Global (Lectura)',
       'area_leader': 'Líder de Área',
       'user': 'Usuario'
