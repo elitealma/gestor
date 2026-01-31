@@ -93,9 +93,18 @@ class DataManager {
         updatedAt: t.updated_at
       }));
 
-      if (this.profile && (this.profile.role === 'super_admin' || this.profile.role === 'admin')) {
-        const { data: areas } = await clientSB.from('areas').select('*');
-        this.areas = areas || [];
+      // Fetch areas for everyone (needed for filters)
+      try {
+        const { data: areas, error: areasError } = await clientSB.from('areas').select('*');
+        if (!areasError) {
+          this.areas = areas || [];
+        } else {
+          console.warn('Could not fetch areas for filter:', areasError);
+          this.areas = [];
+        }
+      } catch (e) {
+        console.warn('Error fetching areas:', e);
+        this.areas = [];
       }
 
       // Load users for task assignment (all profiles for admin, area users for area_leader)
@@ -807,22 +816,32 @@ class UIController {
     // Populate Area Filter Dropdown (if empty or needs update)
     const areaSelect = document.getElementById('filter-projects-area');
     if (areaSelect && areaSelect.options.length <= 1) {
-      // Get unique areas from projects or use fetched areas if available
-      const uniqueAreas = new Map();
-      // Prefer fetching from areas table if we had it, but we can extract from projects for now
-      this.dataManager.projects.forEach(p => {
-        if (p.areas) {
-          uniqueAreas.set(p.area_id, p.areas.name);
-        }
-      });
+      // Prefer using fetched areas from DataManager
+      if (this.dataManager.areas && this.dataManager.areas.length > 0) {
+        this.dataManager.areas.forEach(area => {
+          const option = document.createElement('option');
+          option.value = area.id;
+          option.textContent = area.name;
+          option.selected = area.id === areaFilter;
+          areaSelect.appendChild(option);
+        });
+      } else {
+        // Fallback: Extract from projects
+        const uniqueAreas = new Map();
+        this.dataManager.projects.forEach(p => {
+          if (p.areas) {
+            uniqueAreas.set(p.area_id, p.areas.name);
+          }
+        });
 
-      uniqueAreas.forEach((name, id) => {
-        const option = document.createElement('option');
-        option.value = id;
-        option.textContent = name;
-        option.selected = id === areaFilter;
-        areaSelect.appendChild(option);
-      });
+        uniqueAreas.forEach((name, id) => {
+          const option = document.createElement('option');
+          option.value = id;
+          option.textContent = name;
+          option.selected = id === areaFilter;
+          areaSelect.appendChild(option);
+        });
+      }
     }
 
     const container = document.getElementById('projects-list');
@@ -1773,7 +1792,8 @@ ui.renderUsersView = async function () {
     auth.updateUIState();
   } catch (error) {
     console.error('Error loading users:', error);
-    container.innerHTML = '<div class="empty-state">Error al cargar usuarios</div>';
+    alert('Error al cargar usuarios: ' + (error.message || 'Error desconocido'));
+    container.innerHTML = `<div class="empty-state">Error al cargar usuarios: ${this.escapeHtml(error.message)}</div>`;
   }
 };
 
