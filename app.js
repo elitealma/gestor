@@ -1923,12 +1923,13 @@ ui.renderUsersView = async function () {
           </div>
           <div class="task-meta">
             ${user.areas ? `<span>🏢 Área: <strong>${this.escapeHtml(user.areas.name)}</strong></span>` : '<span>🌐 Sin área asignada</span>'}
-            <span>📅 Desde: ${new Date(user.created_at).toLocaleDateString()}</span>
+            <span>📅 Desde: ${user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Desconocido'}</span>
           </div>
         </div>
         <div class="task-actions admin-only">
           <button class="btn-icon btn-secondary" onclick="ui.viewUserDetails('${user.id}')" title="Ver proyectos y tareas">👁️</button>
           <button class="btn-icon btn-secondary" onclick="ui.editUser('${user.id}')" title="Editar usuario">✏️</button>
+          <button class="btn-icon btn-danger" onclick="ui.deleteUser('${user.id}')" title="Eliminar usuario">🗑️</button>
         </div>
       </div>
     `).join('');
@@ -1938,6 +1939,25 @@ ui.renderUsersView = async function () {
     console.error('Error loading users:', error);
     alert('Error al cargar usuarios: ' + (error.message || 'Error desconocido'));
     container.innerHTML = `<div class="empty-state">Error al cargar usuarios: ${this.escapeHtml(error.message)}</div>`;
+  }
+};
+
+// Delete User Helper
+ui.deleteUser = async function (id) {
+  if (!confirm('¿Estás seguro de que deseas eliminar este usuario? Se eliminará su perfil permanentemente.')) return;
+
+  try {
+    const { error } = await clientSB
+      .from('profiles')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    alert('✅ Usuario eliminado exitosamente');
+    ui.renderUsersView();
+  } catch (error) {
+    alert('❌ Error al eliminar el usuario: ' + error.message);
   }
 };
 
