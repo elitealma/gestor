@@ -19,6 +19,7 @@ class DataManager {
     this.profile = null;
     this.currentView = 'dashboard';
     this.realtimeSubscriptions = []; // Real-time subscriptions
+    this.selectedProjectId = null; // For filtering tasks by project
   }
 
   // Supabase Data Fetching
@@ -143,14 +144,13 @@ class DataManager {
       .update({
         name: projectData.name,
         description: projectData.description,
-        status: projectData.status,
-        updated_at: new Date().toISOString()
+        status: projectData.status
       })
       .eq('id', id)
       .select();
 
     if (error) throw error;
-    const project = { ...data[0], createdAt: data[0].created_at, updatedAt: data[0].updated_at };
+    const project = { ...data[0], createdAt: data[0].created_at };
     const index = this.projects.findIndex(p => p.id === id);
     if (index !== -1) this.projects[index] = project;
     return project;
@@ -169,20 +169,29 @@ class DataManager {
 
   // Task CRUD
   async createTask(taskData) {
+    console.log('Creating task with data:', taskData);
+    const insertData = {
+      title: taskData.title,
+      description: taskData.description || '',
+      project_id: taskData.projectId || null,
+      status: taskData.status || 'pending',
+      due_date: taskData.dueDate || formatDateYYYYMMDD(new Date()),
+      area_id: this.profile?.area_id || null,
+      assigned_to: taskData.assignedTo || auth.user?.id || null
+    };
+    console.log('Insert data:', insertData);
+
     const { data, error } = await clientSB
       .from('tasks')
-      .insert([{
-        title: taskData.title,
-        description: taskData.description,
-        project_id: taskData.projectId,
-        status: taskData.status,
-        due_date: taskData.dueDate || formatDateYYYYMMDD(new Date()),
-        area_id: this.profile?.area_id || null,
-        assigned_to: taskData.assignedTo || auth.user?.id || null
-      }])
+      .insert([insertData])
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error creating task:', error);
+      throw error;
+    }
+
+    console.log('Task created:', data);
     const task = {
       ...data[0],
       projectId: data[0].project_id,
@@ -806,20 +815,20 @@ class UIController {
     const statusBadge = this.getStatusBadge(project.status);
 
     return `
-      <div class="project-card" data-project-id="${project.id}">
+      <div class="project-card" data-project-id="${project.id}" onclick="ui.viewProjectTasks('${project.id}')" style="cursor: pointer;">
         <div class="project-header">
           <div>
             <h3 class="project-title">${this.escapeHtml(project.name)}</h3>
             ${statusBadge}
           </div>
           <div class="project-actions admin-only">
-            <button class="btn-icon btn-secondary" onclick="ui.openTaskModal('${project.id}')" title="Agregar tarea">
+            <button class="btn-icon btn-secondary" onclick="event.stopPropagation(); ui.openTaskModal('${project.id}')" title="Agregar tarea">
               ➕
             </button>
-            <button class="btn-icon btn-secondary" onclick="ui.editProject('${project.id}')" title="Editar proyecto">
+            <button class="btn-icon btn-secondary" onclick="event.stopPropagation(); ui.editProject('${project.id}')" title="Editar proyecto">
               ✏️
             </button>
-            <button class="btn-icon btn-secondary" onclick="ui.deleteProject('${project.id}')" title="Eliminar proyecto">
+            <button class="btn-icon btn-secondary" onclick="event.stopPropagation(); ui.deleteProject('${project.id}')" title="Eliminar proyecto">
               🗑️
             </button>
           </div>
@@ -854,7 +863,13 @@ class UIController {
   renderTasks(filter = 'all', search = '') {
     let tasks = this.dataManager.tasks;
 
-    // Apply filter
+    // Apply project filter if set
+    const selectedProjectId = this.dataManager.selectedProjectId;
+    if (selectedProjectId) {
+      tasks = tasks.filter(t => t.projectId === selectedProjectId);
+    }
+
+    // Apply status filter
     if (filter !== 'all') {
       tasks = tasks.filter(t => t.status === filter);
     }
@@ -863,14 +878,26 @@ class UIController {
     if (search) {
       tasks = tasks.filter(t =>
         t.title.toLowerCase().includes(search.toLowerCase()) ||
-        t.description.toLowerCase().includes(search.toLowerCase())
+        (t.description && t.description.toLowerCase().includes(search.toLowerCase()))
       );
     }
 
     const container = document.getElementById('tasks-list');
 
+    // Build header with project filter indicator
+    let headerHtml = '';
+    if (selectedProjectId) {
+      const project = this.dataManager.getProject(selectedProjectId);
+      headerHtml = `
+        <div class="filter-header" style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; padding: 0.75rem 1rem; background: var(--surface-color); border-radius: 8px; border: 1px solid var(--border-color);">
+          <span>📁 Mostrando tareas de: <strong>${this.escapeHtml(project?.name || 'Proyecto')}</strong></span>
+          <button class="btn btn-secondary" onclick="ui.clearProjectFilter()" style="margin-left: auto;">✕ Ver todas</button>
+        </div>
+      `;
+    }
+
     if (tasks.length === 0) {
-      container.innerHTML = `
+      container.innerHTML = headerHtml + `
         <div class="empty-state">
           <div class="empty-state-icon">✓</div>
           <div class="empty-state-text">No se encontraron tareas</div>
@@ -879,7 +906,7 @@ class UIController {
       return;
     }
 
-    container.innerHTML = tasks.map(task => this.renderTaskItem(task)).join('');
+    container.innerHTML = headerHtml + tasks.map(task => this.renderTaskItem(task)).join('');
   }
 
   renderTaskItem(task) {
@@ -1380,6 +1407,19 @@ class UIController {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  // View tasks for a specific project
+  viewProjectTasks(projectId) {
+    console.log('viewProjectTasks called with:', projectId);
+    this.dataManager.selectedProjectId = projectId;
+    this.switchView('tasks');
+  }
+
+  // Clear project filter and show all tasks
+  clearProjectFilter() {
+    this.dataManager.selectedProjectId = null;
+    this.renderTasks();
   }
 }
 
