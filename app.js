@@ -474,13 +474,25 @@ class AuthController {
   }
 
   canEditProjects() {
-    return this.isAdmin() || this.isSuperManager() || this.isAreaLeader();
+    // Allow any authenticated user (except strictly read-only roles) to manage projects
+    if (!this.user) return false;
+    if (this.isViewer()) return false;
+
+    // Admin and Super Manager have full access
+    if (this.isAdmin() || this.isSuperManager()) return true;
+
+    // Area Leaders and Standard Users can manage projects
+    // Note: Standard users will create projects in their area (or null area)
+    return true;
   }
 
   canEditTasks() {
+    if (!this.user) return false;
     if (this.isAdmin() || this.isSuperManager()) return true;
-    // Admin (Global Viewer) cannot edit tasks
-    return this.user && !this.isViewer() && !this.isGlobalAdmin();
+
+    // Viewers and Global Admins (read-only) cannot edit tasks
+    // Everyone else (including 'user' and 'area_leader') can
+    return !this.isViewer() && !this.isGlobalAdmin();
   }
 
   updateUIState() {
@@ -1063,7 +1075,7 @@ class UIController {
           <div class="task-meta">
             <span>📁 ${project ? this.escapeHtml(project.name) : 'Sin proyecto'}</span>
             <span>📅 ${task.dueDate}</span>
-            ${assignedUser ? `<span>👤 ${this.escapeHtml(assignedUser.username || assignedUser.email?.split('@')[0] || 'Usuario')}</span>` : ''}
+            ${assignedUser ? `<span>👤 ${this.escapeHtml((assignedUser.username || assignedUser.email || 'Usuario').split('@')[0])}</span>` : ''}
             ${statusBadge}
           </div>
         </div>
@@ -1127,9 +1139,10 @@ class UIController {
     const itemsList = items.map(item => {
       if (item.type === 'task') {
         const assignedUser = item.assignedTo ? this.dataManager.getUserById(item.assignedTo) : null;
-        const userInitial = assignedUser ? (assignedUser.email?.[0] || assignedUser.username?.[0] || '?').toUpperCase() : '';
+        const userInitial = assignedUser ? ((assignedUser.username || assignedUser.email || '?').split('@')[0][0]).toUpperCase() : '';
+        const userName = assignedUser ? (assignedUser.username || assignedUser.email || 'Usuario').split('@')[0] : '';
         const project = this.dataManager.getProject(item.projectId);
-        return `<div class="calendar-task-dot ${item.status === 'completed' ? 'completed' : ''}" title="${this.escapeHtml(item.title)}${assignedUser ? ' - ' + (assignedUser.email || assignedUser.username) : ''}${project ? ' [' + this.escapeHtml(project.name) + ']' : ''}">${userInitial ? userInitial + ': ' : ''}${this.escapeHtml(item.title)}</div>`;
+        return `<div class="calendar-task-dot ${item.status === 'completed' ? 'completed' : ''}" title="${this.escapeHtml(item.title)}${assignedUser ? ' - ' + this.escapeHtml(userName) : ''}${project ? ' [' + this.escapeHtml(project.name) + ']' : ''}">${userInitial ? userInitial + ': ' : ''}${this.escapeHtml(item.title)}</div>`;
       }
       return '';
     }).join('');
@@ -1199,6 +1212,13 @@ class UIController {
     e.preventDefault();
     if (!auth.canEditProjects()) return this.openAuthModal();
 
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const submitText = document.getElementById('project-submit-text');
+    const originalText = submitText.textContent;
+
+    submitBtn.disabled = true;
+    submitText.textContent = 'Guardando...';
+
     const id = document.getElementById('project-id').value;
     const projectData = {
       name: document.getElementById('project-name').value,
@@ -1215,7 +1235,11 @@ class UIController {
       this.closeProjectModal();
       this.refreshCurrentView();
     } catch (error) {
-      alert('Error: ' + error.message);
+      console.error('Error saving project:', error);
+      alert('Error: ' + (error.message || error.error_description || JSON.stringify(error)));
+    } finally {
+      submitBtn.disabled = false;
+      submitText.textContent = originalText;
     }
   }
 
@@ -1249,12 +1273,21 @@ class UIController {
         `<option value="${p.id}" ${projectId === p.id ? 'selected' : ''}>${this.escapeHtml(p.name)}</option>`
       ).join('');
 
-    // Populate user select
+    // Populate user select - FORCE CLEAN DISPLAY
     if (userSelect && this.dataManager.users.length > 0) {
-      userSelect.innerHTML = '<option value="">Sin asignar</option>' +
-        this.dataManager.users.map(u =>
-          `<option value="${u.id}" ${u.id === auth.user?.id ? 'selected' : ''}>${this.escapeHtml(u.email || u.username || 'Usuario')}</option>`
-        ).join('');
+      userSelect.innerHTML = '<option value="">Sin asignar *</option>' +
+        this.dataManager.users.map(u => {
+          let nameToDisplay = 'Usuario';
+          if (u.username) nameToDisplay = u.username;
+          else if (u.email) nameToDisplay = u.email;
+
+          // Always strip @ and everything after
+          if (nameToDisplay && nameToDisplay.includes('@')) {
+            nameToDisplay = nameToDisplay.split('@')[0];
+          }
+
+          return `<option value="${u.id}" ${u.id === auth.user?.id ? 'selected' : ''}>${this.escapeHtml(nameToDisplay)}</option>`;
+        }).join('');
     }
 
     document.getElementById('task-id').value = '';
@@ -1323,10 +1356,18 @@ class UIController {
 
     // Populate user select
     if (userSelect && this.dataManager.users.length > 0) {
-      userSelect.innerHTML = '<option value="">Sin asignar</option>' +
-        this.dataManager.users.map(u =>
-          `<option value="${u.id}">${this.escapeHtml(u.email || u.username || 'Usuario')}</option>`
-        ).join('');
+      userSelect.innerHTML = '<option value="">Sin asignar *</option>' +
+        this.dataManager.users.map(u => {
+          let nameToDisplay = 'Usuario';
+          if (u.username) nameToDisplay = u.username;
+          else if (u.email) nameToDisplay = u.email;
+
+          if (nameToDisplay && nameToDisplay.includes('@')) {
+            nameToDisplay = nameToDisplay.split('@')[0];
+          }
+
+          return `<option value="${u.id}">${this.escapeHtml(nameToDisplay)}</option>`;
+        }).join('');
     }
 
     document.getElementById('task-id').value = task.id;
@@ -1514,7 +1555,8 @@ class UIController {
       profiles.forEach(user => {
         const option = document.createElement('option');
         option.value = user.id;
-        option.textContent = user.username || user.email?.split('@')[0] || 'Usuario';
+        const rawName = user.username || user.email || 'Usuario';
+        option.textContent = rawName.split('@')[0];
         option.selected = user.id === selectedValue;
         selectElement.appendChild(option);
       });
@@ -1923,7 +1965,7 @@ ui.renderUsersView = async function () {
           </div>
           <div class="task-meta">
             ${user.areas ? `<span>🏢 Área: <strong>${this.escapeHtml(user.areas.name)}</strong></span>` : '<span>🌐 Sin área asignada</span>'}
-            <span>📅 Desde: ${user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Desconocido'}</span>
+            <span>📅 Desde: ${user.created_at && !isNaN(new Date(user.created_at)) ? new Date(user.created_at).toLocaleDateString() : 'Sin fecha'}</span>
           </div>
         </div>
         <div class="task-actions admin-only">
