@@ -124,7 +124,10 @@ class DataManager {
 
       return true;
     } catch (error) {
-      console.error('Error cargando datos de Supabase:', error);
+      console.error('CRITICAL: Error loading data from Supabase:', error);
+      // Log more details to help debugging
+      if (error.code) console.error('Error Code:', error.code);
+      if (error.message) console.error('Error Message:', error.message);
       return false;
     }
   }
@@ -762,16 +765,20 @@ class UIController {
 
     // Render content
     this.dataManager.currentView = view;
-    if (view === 'dashboard') {
-      this.renderDashboard();
-    } else if (view === 'projects') {
-      this.renderProjects();
-    } else if (view === 'tasks') {
-      this.renderTasks();
-    } else if (view === 'calendar') {
-      this.renderCalendar();
+    try {
+      if (view === 'dashboard') {
+        this.renderDashboard();
+      } else if (view === 'projects') {
+        this.renderProjects();
+      } else if (view === 'tasks') {
+        this.renderTasks();
+      } else if (view === 'calendar') {
+        this.renderCalendar();
+      }
+      this.updateStats();
+    } catch (e) {
+      console.error(`Error rendering view "${view}":`, e);
     }
-    this.updateStats();
   }
 
   // Dashboard Rendering
@@ -1924,7 +1931,7 @@ ui.deleteArea = async function (id) {
     alert('✅ Área eliminada exitosamente');
     ui.renderAreasView();
     // Also refresh data manager to update filters
-    ui.dataManager.init();
+    ui.dataManager.loadInitialData().then(() => ui.refreshCurrentView());
   } catch (error) {
     alert('❌ Error al eliminar el área: ' + error.message);
   }
@@ -2047,7 +2054,7 @@ document.getElementById('area-form')?.addEventListener('submit', async (e) => {
     document.getElementById('area-modal').classList.add('hidden');
     ui.renderAreasView();
     // Refresh data manager to update filters
-    ui.dataManager.init();
+    ui.dataManager.loadInitialData().then(() => ui.refreshCurrentView());
   } catch (error) {
     alert('❌ Error: ' + error.message);
   }
