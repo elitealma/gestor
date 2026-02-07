@@ -3,7 +3,9 @@ FROM nginx:alpine
 # Copiar archivos de la aplicación
 COPY index.html /usr/share/nginx/html/
 COPY styles.css /usr/share/nginx/html/
+COPY kanban.css /usr/share/nginx/html/
 COPY app.js /usr/share/nginx/html/
+COPY kanban.js /usr/share/nginx/html/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
