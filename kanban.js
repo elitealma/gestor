@@ -2,6 +2,7 @@
 // This file extends UIController with Kanban board functionality
 
 // Render Kanban Card (replaces renderTaskItem for Kanban view)
+// Render Kanban Card (replaces renderTaskItem for Kanban view)
 UIController.prototype.renderKanbanCard = function (task) {
     const project = this.dataManager.getProject(task.projectId);
     const assignedUser = task.assignedTo ? this.dataManager.getUserById(task.assignedTo) : null;
@@ -13,22 +14,45 @@ UIController.prototype.renderKanbanCard = function (task) {
     const approvalBadge = isCompleted ? this.getApprovalBadge(task) : '';
     const approvalActions = isCompleted && task.approved === null && isLeader ? this.getApprovalActions(task) : '';
 
+    // User Initials for Avatar
+    let userInitials = 'U';
+    let userColor = 'var(--primary-color)';
+    if (assignedUser) {
+        const name = assignedUser.username || assignedUser.email || 'U';
+        userInitials = name.substring(0, 2).toUpperCase();
+    }
+
+    // Format Date
+    const dateObj = new Date(task.dueDate);
+    const dateStr = dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+
     return `
     <div class="kanban-task-card" draggable="${canEdit ? 'true' : 'false'}" data-task-id="${task.id}" data-task-status="${task.status}">
-      <div class="kanban-task-title">${this.escapeHtml(task.title)}</div>
-      <div class="kanban-task-meta">
-        ${project ? `<span>📁 ${this.escapeHtml(project.name)}</span>` : ''}
-        <span>📅 ${task.dueDate}</span>
-        ${assignedUser ? `<span>👤 ${this.escapeHtml((assignedUser.username || assignedUser.email || 'Usuario').split('@')[0])}</span>` : ''}
-      </div>
-      ${approvalBadge}
-      ${approvalActions}
-      ${canEdit ? `
-        <div class="task-actions editor-only" style="display: flex; gap: 0.5rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
-          <button class="btn-icon btn-secondary" onclick="ui.editTask('${task.id}')" title="Editar tarea" style="font-size: 16px;">✏️</button>
-          <button class="btn-icon btn-secondary" onclick="ui.deleteTask('${task.id}')" title="Eliminar tarea" style="font-size: 16px;">🗑️</button>
+        <div class="card-header">
+            ${project ? `<span class="card-project-tag">${this.escapeHtml(project.name)}</span>` : '<span class="card-project-tag" style="opacity:0.5">Sin Proyecto</span>'}
+            ${canEdit ? `
+                <div class="card-actions editor-only">
+                     <button class="btn-icon-small" onclick="ui.editTask('${task.id}')" title="Editar">✏️</button>
+                </div>
+            ` : ''}
         </div>
-      ` : ''}
+        
+        <div class="kanban-task-title">${this.escapeHtml(task.title)}</div>
+        
+        ${approvalBadge}
+        ${approvalActions}
+        
+        <div class="kanban-task-footer">
+            <span class="task-date">📅 ${dateStr}</span>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="task-id">#${task.id.substring(0, 4)}</span>
+                ${assignedUser ? `
+                    <div class="task-assignee" title="${this.escapeHtml(assignedUser.username || assignedUser.email)}">
+                        ${userInitials}
+                    </div>
+                ` : ''}
+            </div>
+        </div>
     </div>
   `;
 };
