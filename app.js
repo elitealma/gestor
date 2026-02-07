@@ -565,7 +565,11 @@ class UIController {
     document.querySelectorAll('.nav-item').forEach(item => {
       item.addEventListener('click', (e) => {
         const view = e.currentTarget.getAttribute('data-view');
-        if (view) this.switchView(view);
+        if (view) {
+          // Clear project filter when navigating from sidebar
+          this.dataManager.selectedProjectId = null;
+          this.switchView(view);
+        }
       });
     });
 
