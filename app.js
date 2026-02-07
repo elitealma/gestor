@@ -2277,10 +2277,10 @@ ui.loadProfileData = function () {
   document.getElementById('settings-email').value = profile.email || '';
 };
 
-// Update SwitchView to handle new routes
-const originalSwitchView = ui.switchView.bind(ui);
-ui.switchView = function (view) {
-  originalSwitchView(view);
+// Update SwitchView to handle new routes on the Prototype so extensions can chain it
+const prototypeSwitchView = UIController.prototype.switchView;
+UIController.prototype.switchView = function (view) {
+  prototypeSwitchView.call(this, view);
   if (view === 'areas') {
     this.renderAreasView();
   } else if (view === 'users') {
