@@ -411,8 +411,13 @@ class AuthController {
     if (isRecovery) {
       setTimeout(() => {
         document.getElementById('update-password-modal')?.classList.remove('hidden');
-      }, 500); // Small delay to ensure DOM is fully ready and stable
+      }, 500);
     }
+
+    // Explicitly load data for the current session state (guest or logged in)
+    await this.ui.dataManager.loadInitialData();
+    this.updateUIState();
+    this.ui.refreshCurrentView();
 
     clientSB.auth.onAuthStateChange(async (event, session) => {
       this.user = session?.user || null;
@@ -1048,6 +1053,8 @@ class UIController {
     const pendingTasks = tasks.filter(t => t.status === 'pending');
     const progressTasks = tasks.filter(t => t.status === 'progress');
     const completedTasks = tasks.filter(t => t.status === 'completed');
+
+    console.log(`Rendering Kanban: ${pendingTasks.length} pending, ${progressTasks.length} progress, ${completedTasks.length} completed`);
 
     // Render in Kanban columns
     const pendingContainer = document.getElementById('tasks-pending');
