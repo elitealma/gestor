@@ -65,10 +65,12 @@ class DataManager {
       */
       const isGlobalPower = this.profile?.role === 'super_admin' || this.profile?.role === 'super_manager' || this.profile?.role === 'admin';
 
-      if (this.profile && !isGlobalPower) {
+      if (this.profile && !isGlobalPower && this.profile.area_id) {
         projectsQuery = projectsQuery.eq('area_id', this.profile.area_id);
         tasksQuery = tasksQuery.eq('area_id', this.profile.area_id);
       }
+
+      console.log(`[DataManager] Fetching data for role: ${this.profile?.role || 'guest'}, area: ${this.profile?.area_id || 'all'}`);
 
       const [{ data: projects, error: projectsError }, { data: tasks, error: tasksError }] = await Promise.all([
         projectsQuery,
@@ -77,6 +79,8 @@ class DataManager {
 
       if (projectsError) throw projectsError;
       if (tasksError) throw tasksError;
+
+      console.log(`[DataManager] Data received: ${projects?.length || 0} projects, ${tasks?.length || 0} tasks`);
 
       this.projects = (projects || []).map(p => ({
         ...p,
