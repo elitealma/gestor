@@ -1,0 +1,53 @@
+// PATCH: Replace the final section of UIController.renderTasks (around line 1035-1061)
+// with the following code:
+
+    // Apply search
+    if (search) {
+      tasks = tasks.filter(t =>
+        t.title.toLowerCase().includes(search.toLowerCase()) ||
+        (t.description && t.description.toLowerCase().includes(search.toLowerCase()))
+      );
+    }
+
+    // Split tasks by status for Kanban columns
+    const pendingTasks = tasks.filter(t => t.status === 'pending');
+    const progressTasks = tasks.filter(t => t.status === 'progress');
+    const completedTasks = tasks.filter(t => t.status === 'completed');
+
+    // Render in Kanban columns
+    const pendingContainer = document.getElementById('tasks-pending');
+    const progressContainer = document.getElementById('tasks-progress');
+    const completedContainer = document.getElementById('tasks-completed');
+
+    if (pendingContainer) {
+      pendingContainer.innerHTML = pendingTasks.length > 0
+        ? pendingTasks.map(task => this.renderKanbanCard(task)).join('')
+        : '<div class="empty-state" style="padding: 2rem; text-align: center; color: var(--text-muted);">Sin tareas</div>';
+    }
+
+    if (progressContainer) {
+      progressContainer.innerHTML = progressTasks.length > 0
+        ? progressTasks.map(task => this.renderKanbanCard(task)).join('')
+        : '<div class="empty-state" style="padding: 2rem; text-align: center; color: var(--text-muted);">Sin tareas</div>';
+    }
+
+    if (completedContainer) {
+      completedContainer.innerHTML = completedTasks.length > 0
+        ? completedTasks.map(task => this.renderKanbanCard(task)).join('')
+        : '<div class="empty-state" style="padding: 2rem; text-align: center; color: var(--text-muted);">Sin tareas</div>';
+    }
+
+    // Update counters
+    document.getElementById('count-pending').textContent = pendingTasks.length;
+    document.getElementById('count-progress').textContent = progressTasks.length;
+    document.getElementById('count-completed').textContent = completedTasks.length;
+
+    // Setup drag-and-drop
+    this.setupDragAndDrop();
+  }
+
+// END PATCH
+
+// INSTRUCTIONS:
+// Replace lines 1035-1061 in app.js with the code above.
+// This changes the renderTasks function to populate Kanban columns instead of a single list.

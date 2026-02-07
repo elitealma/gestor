@@ -15,6 +15,7 @@
 
   <!-- Styles -->
   <link rel="stylesheet" href="styles.css?v=1.0.7">
+  <link rel="stylesheet" href="kanban.css">
 
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -223,8 +224,35 @@
           </div>
         </div>
 
-        <!-- Tasks List -->
-        <div id="tasks-list" class="tasks-list"></div>
+        <!-- Kanban Board -->
+        <div id="tasks-kanban" class="kanban-board">
+          <div class="kanban-column" data-status="pending">
+            <div class="kanban-column-header">
+              <span class="kanban-column-icon">📋</span>
+              <h3 class="kanban-column-title">Pendientes</h3>
+              <span class="kanban-column-count" id="count-pending">0</span>
+            </div>
+            <div class="kanban-column-content" id="tasks-pending" data-status="pending"></div>
+          </div>
+
+          <div class="kanban-column" data-status="progress">
+            <div class="kanban-column-header">
+              <span class="kanban-column-icon">⚡</span>
+              <h3 class="kanban-column-title">En Progreso</h3>
+              <span class="kanban-column-count" id="count-progress">0</span>
+            </div>
+            <div class="kanban-column-content" id="tasks-progress" data-status="progress"></div>
+          </div>
+
+          <div class="kanban-column" data-status="completed">
+            <div class="kanban-column-header">
+              <span class="kanban-column-icon">✅</span>
+              <h3 class="kanban-column-title">Completadas</h3>
+              <span class="kanban-column-count" id="count-completed">0</span>
+            </div>
+            <div class="kanban-column-content" id="tasks-completed" data-status="completed"></div>
+          </div>
+        </div>
       </section>
 
       <!-- Calendar View -->
@@ -630,6 +658,7 @@
 
   <!-- JavaScript -->
   <script src="app.js?v=2.1.7"></script>
+  <script src="kanban.js"></script>
 </body>
 
 </html>

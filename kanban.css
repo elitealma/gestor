@@ -1,0 +1,198 @@
+/* ===== KANBAN BOARD ===== */
+.kanban-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-lg);
+    min-height: 500px;
+}
+
+.kanban-column {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.kanban-column-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    backdrop-filter: blur(10px);
+}
+
+.kanban-column-icon {
+    font-size: var(--font-size-2xl);
+}
+
+.kanban-column-title {
+    flex: 1;
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    margin: 0;
+}
+
+.kanban-column-count {
+    background: rgba(102, 126, 234, 0.2);
+    color: var(--accent-purple);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: 999px;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    min-width: 28px;
+    text-align: center;
+}
+
+.kanban-column-content {
+    flex: 1;
+    padding: var(--spacing-md);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    min-height: 300px;
+}
+
+/* Kanban Task Card */
+.kanban-task-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    cursor: grab;
+    transition: all var(--transition-base);
+    position: relative;
+}
+
+.kanban-task-card:hover {
+    border-color: rgba(102, 126, 234, 0.5);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.kanban-task-card.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+    transform: rotate(3deg) scale(1.05);
+}
+
+.kanban-column-content.drag-over {
+    background: rgba(102, 126, 234, 0.1);
+    border: 2px dashed var(--accent-purple);
+}
+
+.kanban-task-title {
+    font-weight: 600;
+    font-size: var(--font-size-base);
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-primary);
+}
+
+.kanban-task-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+}
+
+.kanban-task-meta>span {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+/* Approval Badges */
+.approval-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: 999px;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    margin-top: var(--spacing-sm);
+}
+
+.approval-badge.pending {
+    background: rgba(251, 191, 36, 0.15);
+    color: var(--status-pending);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.approval-badge.approved {
+    background: rgba(52, 211, 153, 0.15);
+    color: var(--status-completed);
+    border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.approval-badge.rejected {
+    background: rgba(245, 87, 108, 0.15);
+    color: #f5576c;
+    border: 1px solid rgba(245, 87, 108, 0.3);
+}
+
+/* Approval Actions */
+.approval-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border-color);
+}
+
+.btn-approve {
+    flex: 1;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: rgba(52, 211, 153, 0.2);
+    color: var(--status-completed);
+    border: 1px solid var(--status-completed);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.btn-approve:hover {
+    background: var(--status-completed);
+    color: white;
+}
+
+.btn-reject {
+    flex: 1;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: rgba(245, 87, 108, 0.2);
+    color: #f5576c;
+    border: 1px solid #f5576c;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.btn-reject:hover {
+    background: #f5576c;
+    color: white;
+}
+
+/* Responsive Kanban */
+@media (max-width: 1024px) {
+    .kanban-board {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    .kanban-column {
+        min-height: 250px;
+    }
+}
