@@ -19,6 +19,8 @@
 
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
@@ -50,6 +52,10 @@
           <li class="nav-item" data-view="calendar">
             <span class="nav-icon">📅</span>
             <span>Calendario</span>
+          </li>
+          <li class="nav-item" data-view="reports" id="nav-reports">
+            <span class="nav-icon">📊</span>
+            <span>Reportes</span>
           </li>
 
           <li class="nav-divider"></li>
@@ -251,6 +257,70 @@
               <span class="kanban-column-count" id="count-completed">0</span>
             </div>
             <div class="kanban-column-content" id="tasks-completed" data-status="completed"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Reports View -->
+      <section id="reports-view" class="view hidden">
+        <div class="content-header">
+          <h1 class="content-title">Reportes y KPIs</h1>
+          <p class="content-subtitle">Métricas de rendimiento y cumplimiento</p>
+        </div>
+
+        <!-- Toolbar con Filtros -->
+        <div class="toolbar">
+          <div class="toolbar-filters">
+            <select id="filter-reports-project" class="form-select select-compact">
+              <option value="all">Todos los Proyectos</option>
+            </select>
+            <select id="filter-reports-area" class="form-select select-compact">
+              <option value="all">Todas las Áreas</option>
+            </select>
+            <select id="filter-reports-user" class="form-select select-compact">
+              <option value="all">Todos los Usuarios</option>
+            </select>
+            <select id="filter-reports-date" class="form-select select-compact">
+              <option value="all">Todas las fechas</option>
+              <option value="today">Hoy</option>
+              <option value="week">Esta semana</option>
+              <option value="month">Este mes</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-compact" id="btn-refresh-reports">
+            <span>🔄</span>
+            <span>Actualizar</span>
+          </button>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="reports-grid">
+          <div class="card chart-card">
+            <h3 class="card-title">Estado de Tareas</h3>
+            <div class="chart-container">
+              <canvas id="chart-tasks-status"></canvas>
+            </div>
+          </div>
+
+          <div class="card chart-card">
+            <h3 class="card-title">Tareas por Área</h3>
+            <div class="chart-container">
+              <canvas id="chart-tasks-area"></canvas>
+            </div>
+          </div>
+
+          <div class="card chart-card wide-card">
+            <h3 class="card-title">Tendencia de Cumplimiento</h3>
+            <div class="chart-container">
+              <canvas id="chart-tasks-trend"></canvas>
+            </div>
+          </div>
+
+          <div class="card chart-card">
+            <h3 class="card-title">Carga de Trabajo por Usuario</h3>
+            <div class="chart-container">
+              <canvas id="chart-tasks-user"></canvas>
+            </div>
           </div>
         </div>
       </section>

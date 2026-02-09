@@ -553,6 +553,7 @@ class UIController {
   constructor(dataManager) {
     this.dataManager = dataManager;
     this.currentAuthTab = 'login';
+    this.charts = {}; // Store for Chart.js instances
     // Removed automatic init() to prevent race conditions
   }
 
@@ -667,19 +668,41 @@ class UIController {
       }
     });
 
-    // Search and Filter
-    document.getElementById('search-projects').addEventListener('input', (e) => this.handleSearchProjects(e));
-    document.getElementById('filter-projects').addEventListener('change', (e) => this.handleFilterProjects(e));
+    // Search and Filters
+    document.getElementById('search-projects')?.addEventListener('input', (e) => this.handleSearchProjects(e));
+    document.getElementById('filter-projects')?.addEventListener('change', (e) => this.handleFilterProjects(e));
     document.getElementById('filter-projects-area')?.addEventListener('change', (e) => this.handleFilterProjectsArea(e));
-    document.getElementById('search-tasks').addEventListener('input', (e) => this.handleSearchTasks(e));
-    document.getElementById('filter-tasks').addEventListener('change', (e) => this.handleFilterTasks(e));
-    document.getElementById('filter-tasks-area')?.addEventListener('change', (e) => this.handleFilterTasksArea(e));
-    document.getElementById('filter-tasks-user')?.addEventListener('change', (e) => this.handleFilterTasksUser(e));
 
-    // Date Filter for Tasks
-    document.getElementById('filter-tasks-date')?.addEventListener('change', (e) => this.handleDateFilterTasks(e));
-    document.getElementById('apply-date-range')?.addEventListener('click', () => this.applyCustomDateRange());
+    document.getElementById('search-tasks')?.addEventListener('input', (e) => this.handleSearchTasks(e));
+    document.getElementById('filter-tasks')?.addEventListener('change', (e) => this.renderTasks(e.target.value));
+    document.getElementById('filter-tasks-date')?.addEventListener('change', (e) => {
+      const dateFilter = e.target.value;
+      const rangeContainer = document.getElementById('date-range-container');
+      if (dateFilter === 'custom') {
+        rangeContainer.classList.remove('hidden');
+      } else {
+        rangeContainer.classList.add('hidden');
+        this.renderTasks('all', '', dateFilter);
+      }
+    });
+    document.getElementById('apply-date-range')?.addEventListener('click', () => {
+      const from = document.getElementById('filter-date-from').value;
+      const to = document.getElementById('filter-date-to').value;
+      this.renderTasks('all', '', 'custom');
+    });
 
+    document.getElementById('filter-tasks-area')?.addEventListener('change', (e) => {
+      this.renderTasks('all', '', 'all', e.target.value);
+    });
+    document.getElementById('filter-tasks-user')?.addEventListener('change', (e) => {
+      this.renderTasks('all', '', 'all', 'all', e.target.value);
+    });
+
+    // Reports Listeners
+    document.getElementById('btn-refresh-reports')?.addEventListener('click', () => this.renderReportsView());
+    ['filter-reports-project', 'filter-reports-area', 'filter-reports-user', 'filter-reports-date'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', () => this.renderReportsView());
+    });
     // Calendar Nav
     document.getElementById('prev-month').addEventListener('click', () => this.changeMonth(-1));
     document.getElementById('next-month').addEventListener('click', () => this.changeMonth(1));
@@ -787,6 +810,8 @@ class UIController {
         this.renderTasks();
       } else if (view === 'calendar') {
         this.renderCalendar();
+      } else if (view === 'reports') {
+        this.renderReportsView();
       }
       this.updateStats();
     } catch (e) {
@@ -2305,5 +2330,189 @@ UIController.prototype.switchView = function (view) {
   }
 };
 
-console.log(' Fase 3: Gestión explícita y Roles Globales cargados');
+// ===== REPORTS & KPIs =====
+
+ui.renderReportsView = function () {
+  const tasks = this.dataManager.tasks;
+  const projects = this.dataManager.projects;
+  const areas = this.dataManager.areas;
+  const users = this.dataManager.users;
+
+  // Populate filters if empty
+  this.populateReportsFilters();
+
+  // Get filter values
+  const projectId = document.getElementById('filter-reports-project').value;
+  const areaId = document.getElementById('filter-reports-area').value;
+  const userId = document.getElementById('filter-reports-user').value;
+  const dateFilter = document.getElementById('filter-reports-date').value;
+
+  // Filter tasks
+  let filteredTasks = tasks;
+  if (projectId !== 'all') filteredTasks = filteredTasks.filter(t => t.projectId === projectId);
+  if (areaId !== 'all') filteredTasks = filteredTasks.filter(t => t.area_id === areaId);
+  if (userId !== 'all') filteredTasks = filteredTasks.filter(t => t.assignedTo === userId);
+
+  if (dateFilter !== 'all') {
+    const now = new Date();
+    if (dateFilter === 'today') {
+      const today = formatDateYYYYMMDD(now);
+      filteredTasks = filteredTasks.filter(t => t.created_at?.startsWith(today));
+    } else if (dateFilter === 'week') {
+      const weekAgo = new Date(now.setDate(now.getDate() - 7));
+      filteredTasks = filteredTasks.filter(t => new Date(t.created_at) >= weekAgo);
+    } else if (dateFilter === 'month') {
+      const monthAgo = new Date(now.setMonth(now.getMonth() - 1));
+      filteredTasks = filteredTasks.filter(t => new Date(t.created_at) >= monthAgo);
+    }
+  }
+
+  // Aggregate Data
+  const statusData = {
+    pending: filteredTasks.filter(t => t.status === 'pending').length,
+    progress: filteredTasks.filter(t => t.status === 'progress').length,
+    completed: filteredTasks.filter(t => t.status === 'completed').length
+  };
+
+  const areaData = {};
+  areas.forEach(a => areaData[a.name] = 0);
+  filteredTasks.forEach(t => {
+    const area = areas.find(a => a.id === t.area_id);
+    if (area) areaData[area.name]++;
+  });
+
+  const userData = {};
+  filteredTasks.forEach(t => {
+    const user = users.find(u => u.id === t.assignedTo);
+    const name = user ? (user.username || user.email.split('@')[0]) : 'Sin asignar';
+    userData[name] = (userData[name] || 0) + 1;
+  });
+
+  // Trend Data (Last 15 days)
+  const trendLabels = [];
+  const trendValues = [];
+  for (let i = 14; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = formatDateYYYYMMDD(d);
+    trendLabels.push(dateStr);
+    trendValues.push(filteredTasks.filter(t => t.status === 'completed' && t.completed_at?.startsWith(dateStr)).length);
+  }
+
+  // Render Charts
+  this.initChart('chart-tasks-status', 'pie', {
+    labels: ['Pendientes', 'En Progreso', 'Completadas'],
+    datasets: [{
+      data: [statusData.pending, statusData.progress, statusData.completed],
+      backgroundColor: ['#fbbf24', '#60a5fa', '#34d399'],
+      borderWidth: 0
+    }]
+  });
+
+  this.initChart('chart-tasks-area', 'bar', {
+    labels: Object.keys(areaData),
+    datasets: [{
+      label: 'Tareas por Área',
+      data: Object.values(areaData),
+      backgroundColor: '#667eea',
+      borderRadius: 6
+    }]
+  }, { indexAxis: 'y' });
+
+  this.initChart('chart-tasks-trend', 'line', {
+    labels: trendLabels,
+    datasets: [{
+      label: 'Tareas Completadas',
+      data: trendValues,
+      borderColor: '#f093fb',
+      backgroundColor: 'rgba(240, 147, 251, 0.1)',
+      fill: true,
+      tension: 0.4
+    }]
+  });
+
+  this.initChart('chart-tasks-user', 'bar', {
+    labels: Object.keys(userData),
+    datasets: [{
+      label: 'Tareas por Usuario',
+      data: Object.values(userData),
+      backgroundColor: '#4facfe',
+      borderRadius: 6
+    }]
+  });
+};
+
+ui.populateReportsFilters = function () {
+  const projectSelect = document.getElementById('filter-reports-project');
+  const areaSelect = document.getElementById('filter-reports-area');
+  const userSelect = document.getElementById('filter-reports-user');
+
+  if (projectSelect) {
+    const currentValue = projectSelect.value;
+    projectSelect.innerHTML = '<option value="all">Todos los Proyectos</option>';
+    this.dataManager.projects.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      projectSelect.appendChild(opt);
+    });
+    projectSelect.value = currentValue || 'all';
+  }
+
+  if (areaSelect) {
+    const currentValue = areaSelect.value;
+    areaSelect.innerHTML = '<option value="all">Todas las Áreas</option>';
+    this.dataManager.areas.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = a.name;
+      areaSelect.appendChild(opt);
+    });
+    areaSelect.value = currentValue || 'all';
+  }
+
+  if (userSelect) {
+    const currentValue = userSelect.value;
+    userSelect.innerHTML = '<option value="all">Todos los Usuarios</option>';
+    this.dataManager.users.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.id;
+      opt.textContent = u.username || u.email.split('@')[0];
+      userSelect.appendChild(opt);
+    });
+    userSelect.value = currentValue || 'all';
+  }
+};
+
+ui.initChart = function (id, type, data, options = {}) {
+  const ctx = document.getElementById(id)?.getContext('2d');
+  if (!ctx) return;
+
+  if (this.charts[id]) {
+    this.charts[id].destroy();
+  }
+
+  const defaultOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { color: '#b4b4c8', font: { family: 'Inter' } }
+      }
+    },
+    scales: type === 'pie' ? {} : {
+      y: { ticks: { color: '#6e6e8f' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+      x: { ticks: { color: '#6e6e8f' }, grid: { display: false } }
+    }
+  };
+
+  this.charts[id] = new Chart(ctx, {
+    type: type,
+    data: data,
+    options: { ...defaultOptions, ...options }
+  });
+};
+
+console.log(' Fase 4: Reportes y KPIs cargados');
 
