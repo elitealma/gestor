@@ -2349,8 +2349,25 @@ ui.renderReportsView = function () {
   const userId = document.getElementById('filter-reports-user').value;
   const dateFilter = document.getElementById('filter-reports-date').value;
 
-  // Filter tasks
+  // Role-based Base Filtering
+  const profile = this.dataManager.profile;
+  const isSuper = auth.isAdmin() || auth.isSuperManager();
+  const isLeader = auth.isAreaLeader();
+  const isGlobal = auth.isGlobalAdmin();
+
   let filteredTasks = tasks;
+
+  if (!isSuper && !isGlobal) {
+    if (isLeader) {
+      // Area leaders see all tasks in their area
+      filteredTasks = filteredTasks.filter(t => t.area_id === profile.area_id);
+    } else {
+      // Normal users only see their own tasks
+      filteredTasks = filteredTasks.filter(t => t.assignedTo === auth.user?.id);
+    }
+  }
+
+  // Apply UI Filters on top of base filter
   if (projectId !== 'all') filteredTasks = filteredTasks.filter(t => t.projectId === projectId);
   if (areaId !== 'all') filteredTasks = filteredTasks.filter(t => t.area_id === areaId);
   if (userId !== 'all') filteredTasks = filteredTasks.filter(t => t.assignedTo === userId);
@@ -2459,10 +2476,15 @@ ui.populateReportsFilters = function () {
   const areaSelect = document.getElementById('filter-reports-area');
   const userSelect = document.getElementById('filter-reports-user');
 
+  const isSuper = auth.isAdmin() || auth.isSuperManager();
+  const isLeader = auth.isAreaLeader();
+  const profile = this.dataManager.profile;
+
   if (projectSelect) {
     const currentValue = projectSelect.value;
     projectSelect.innerHTML = '<option value="all">Todos los Proyectos</option>';
     this.dataManager.projects.forEach(p => {
+      // Area leaders only see projects related to their area (if projects have area_id, else show all)
       const opt = document.createElement('option');
       opt.value = p.id;
       opt.textContent = p.name;
@@ -2472,27 +2494,43 @@ ui.populateReportsFilters = function () {
   }
 
   if (areaSelect) {
-    const currentValue = areaSelect.value;
-    areaSelect.innerHTML = '<option value="all">Todas las Áreas</option>';
-    this.dataManager.areas.forEach(a => {
-      const opt = document.createElement('option');
-      opt.value = a.id;
-      opt.textContent = a.name;
-      areaSelect.appendChild(opt);
-    });
-    areaSelect.value = currentValue || 'all';
+    if (!isSuper && !auth.isGlobalAdmin()) {
+      areaSelect.classList.add('hidden');
+    } else {
+      areaSelect.classList.remove('hidden');
+      const currentValue = areaSelect.value;
+      areaSelect.innerHTML = '<option value="all">Todas las Áreas</option>';
+      this.dataManager.areas.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = a.name;
+        areaSelect.appendChild(opt);
+      });
+      areaSelect.value = currentValue || 'all';
+    }
   }
 
   if (userSelect) {
-    const currentValue = userSelect.value;
-    userSelect.innerHTML = '<option value="all">Todos los Usuarios</option>';
-    this.dataManager.users.forEach(u => {
-      const opt = document.createElement('option');
-      opt.value = u.id;
-      opt.textContent = u.username || u.email.split('@')[0];
-      userSelect.appendChild(opt);
-    });
-    userSelect.value = currentValue || 'all';
+    if (!isSuper && !isLeader && !auth.isGlobalAdmin()) {
+      userSelect.classList.add('hidden');
+    } else {
+      userSelect.classList.remove('hidden');
+      const currentValue = userSelect.value;
+      userSelect.innerHTML = '<option value="all">Todos los Usuarios</option>';
+
+      let usersToDisplay = this.dataManager.users;
+      if (isLeader && !isSuper) {
+        usersToDisplay = usersToDisplay.filter(u => u.area_id === profile.area_id);
+      }
+
+      usersToDisplay.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = u.username || u.email.split('@')[0];
+        userSelect.appendChild(opt);
+      });
+      userSelect.value = currentValue || 'all';
+    }
   }
 };
 
