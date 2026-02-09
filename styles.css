@@ -951,19 +951,20 @@ body::before {
   flex-wrap: wrap;
   gap: var(--spacing-sm);
   align-items: center;
-  flex: 1;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .toolbar-actions {
   display: flex;
   gap: var(--spacing-sm);
   align-items: center;
+  margin-left: auto;
 }
 
 .search-box {
   position: relative;
   flex-shrink: 0;
+  margin-right: auto;
 }
 
 .search-input {
