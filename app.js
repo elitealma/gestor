@@ -2321,7 +2321,9 @@ ui.loadProfileData = function () {
 const prototypeSwitchView = UIController.prototype.switchView;
 UIController.prototype.switchView = function (view) {
   prototypeSwitchView.call(this, view);
-  if (view === 'areas') {
+  if (view === 'reports') {
+    setTimeout(() => this.renderReportsView(), 50);
+  } else if (view === 'areas') {
     this.renderAreasView();
   } else if (view === 'users') {
     this.renderUsersView();
@@ -2391,13 +2393,23 @@ ui.renderReportsView = function () {
   // Trend Data (Last 15 days)
   const trendLabels = [];
   const trendValues = [];
+  const todayDate = new Date();
+
   for (let i = 14; i >= 0; i--) {
-    const d = new Date();
+    const d = new Date(todayDate);
     d.setDate(d.getDate() - i);
     const dateStr = formatDateYYYYMMDD(d);
     trendLabels.push(dateStr);
-    trendValues.push(filteredTasks.filter(t => t.status === 'completed' && t.completed_at?.startsWith(dateStr)).length);
+
+    const count = filteredTasks.filter(t => {
+      if (t.status !== 'completed' || !t.completed_at) return false;
+      return t.completed_at.startsWith(dateStr);
+    }).length;
+
+    trendValues.push(count);
   }
+
+  console.log('Rendering Charts with tasks:', filteredTasks.length);
 
   // Render Charts
   this.initChart('chart-tasks-status', 'pie', {
