@@ -56,17 +56,31 @@ class DataManager {
 
       this.profile = profile || null;
 
+      if (!this.profile) {
+        console.log('[DataManager] Guest mode: No data fetched');
+        this.projects = [];
+        this.tasks = [];
+        this.areas = [];
+        return true;
+      }
+
       let projectsQuery = clientSB.from('projects').select('*, areas(name)').order('created_at', { ascending: false });
       let tasksQuery = clientSB.from('tasks').select('*').order('created_at', { ascending: false });
 
       /* 
       // Filter logic: Local users only see their area. 
       // Super Admin and Global Admin (read-only) see EVERYTHING.
+      // Area Leaders see their area OR shared projects.
       */
       const isGlobalPower = this.profile?.role === 'super_admin' || this.profile?.role === 'super_manager' || this.profile?.role === 'admin';
 
       if (this.profile && !isGlobalPower && this.profile.area_id) {
-        projectsQuery = projectsQuery.eq('area_id', this.profile.area_id);
+        if (this.profile.role === 'area_leader') {
+          // Special case for Area Leaders: their area OR is_shared
+          projectsQuery = projectsQuery.or(`area_id.eq.${this.profile.area_id},is_shared.eq.true`);
+        } else {
+          projectsQuery = projectsQuery.eq('area_id', this.profile.area_id);
+        }
         tasksQuery = tasksQuery.eq('area_id', this.profile.area_id);
       }
 
@@ -544,6 +558,24 @@ class AuthController {
     document.querySelectorAll('.editor-only').forEach(el => {
       el.classList.toggle('hidden', !canEditTasks && !isSuperAdmin);
     });
+
+    // Hide area filters for non-global roles
+    const isGlobalFilterRole = isSuperAdmin || isGlobalAdmin || auth.isSuperManager();
+    const projectAreaFilter = document.getElementById('filter-projects-area');
+    const taskAreaFilter = document.getElementById('filter-tasks-area');
+    const reportAreaFilter = document.getElementById('filter-reports-area');
+
+    if (projectAreaFilter) projectAreaFilter.classList.toggle('hidden', !isGlobalFilterRole);
+    if (taskAreaFilter) taskAreaFilter.classList.toggle('hidden', !isGlobalFilterRole);
+    if (reportAreaFilter) reportAreaFilter.classList.toggle('hidden', !isGlobalFilterRole);
+
+    // Hide user filter for standard users (only area leaders and admins can filter by user)
+    const canSeeUserFilter = isGlobalFilterRole || isAreaLeader;
+    const taskUserFilter = document.getElementById('filter-tasks-user');
+    const reportUserFilter = document.getElementById('filter-reports-user');
+
+    if (taskUserFilter) taskUserFilter.classList.toggle('hidden', !canSeeUserFilter);
+    if (reportUserFilter) reportUserFilter.classList.toggle('hidden', !canSeeUserFilter);
   }
 }
 

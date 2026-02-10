@@ -1629,3 +1629,31 @@ canvas {
     grid-template-columns: 1fr;
   }
 }
+
+/* Guest Mode Restrictions */
+body.guest-mode .sidebar .nav-item[data-view="projects"],
+body.guest-mode .sidebar .nav-item[data-view="tasks"],
+body.guest-mode .sidebar .nav-item[data-view="calendar"],
+body.guest-mode .sidebar .nav-item[data-view="reports"],
+body.guest-mode #projects-view,
+body.guest-mode #tasks-view,
+body.guest-mode #calendar-view,
+body.guest-mode #reports-view,
+body.guest-mode .stats-grid,
+body.guest-mode .today-tasks-container,
+body.guest-mode #recent-projects {
+  display: none !important;
+}
+
+body.guest-mode #dashboard-view .content-header {
+  text-align: center;
+  margin-top: 5rem;
+}
+
+body.guest-mode #dashboard-view .content-header::after {
+  content: "Por favor, inicia sesión para ver tus proyectos y tareas.";
+  display: block;
+  margin-top: 1rem;
+  font-size: 1.2rem;
+  color: var(--text-muted);
+}
