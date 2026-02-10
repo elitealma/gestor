@@ -30,7 +30,7 @@ class DataManager {
       if (auth.user) {
         let { data: existingProfile } = await clientSB
           .from('profiles')
-          .select('*, areas(*)')
+          .select('*')
           .eq('id', auth.user.id)
           .maybeSingle();
 
@@ -42,7 +42,7 @@ class DataManager {
               email: auth.user.email,
               role: auth.user.email === 'elitealmaia@gmail.com' ? 'super_admin' : 'user'
             }])
-            .select('*, areas(*)')
+            .select('*')
             .maybeSingle();
 
           if (!insertError) {
@@ -65,7 +65,7 @@ class DataManager {
         return true;
       }
 
-      let projectsQuery = clientSB.from('projects').select('*, areas(name)').order('created_at', { ascending: false });
+      let projectsQuery = clientSB.from('projects').select('*').order('created_at', { ascending: false });
       let tasksQuery = clientSB.from('tasks').select('*').order('created_at', { ascending: false });
 
       /* 
@@ -73,7 +73,7 @@ class DataManager {
       // Super Admin and Global Admin (read-only) see EVERYTHING.
       // Area Leaders see their area OR shared projects.
       */
-      const isGlobalPower = this.profile?.role === 'super_admin' || this.profile?.role === 'super_manager' || this.profile?.role === 'admin';
+      const isGlobalPower = this.profile?.role === 'super_admin' || this.profile?.role === 'super_manager' || this.profile?.role === 'admin' || this.profile?.role === 'viewer';
 
       // Fetch allowed areas for lider_data
       this.allowedAreas = [];
@@ -96,9 +96,9 @@ class DataManager {
           projectsQuery = projectsQuery.or(`${areaFilterStr},is_shared.eq.true`);
           tasksQuery = tasksQuery.filter('area_id', 'in', `(${this.allowedAreas.join(',')})`);
         } else if (this.profile.role === 'user' && this.profile.area_id) {
-          // Standard Users: their area
+          // Standard Users: their area OR tasks assigned to them
           projectsQuery = projectsQuery.eq('area_id', this.profile.area_id);
-          tasksQuery = tasksQuery.eq('area_id', this.profile.area_id);
+          tasksQuery = tasksQuery.or(`area_id.eq.${this.profile.area_id},assigned_to.eq.${this.profile.id}`);
         }
       }
 
@@ -116,6 +116,7 @@ class DataManager {
 
       this.projects = (projects || []).map(p => ({
         ...p,
+        assignedTo: p.assigned_to,
         createdAt: p.created_at,
         updatedAt: p.updated_at
       }));
@@ -176,7 +177,8 @@ class DataManager {
         name: projectData.name,
         description: projectData.description,
         status: projectData.status,
-        area_id: this.profile?.area_id || null
+        area_id: this.profile?.area_id || null,
+        assigned_to: projectData.assignedTo || auth.user?.id || null
       }])
       .select();
 
@@ -192,7 +194,8 @@ class DataManager {
       .update({
         name: projectData.name,
         description: projectData.description,
-        status: projectData.status
+        status: projectData.status,
+        assigned_to: projectData.assignedTo
       })
       .eq('id', id)
       .select();
@@ -560,7 +563,7 @@ class AuthController {
     document.getElementById('nav-users').classList.toggle('hidden', !canSeeUsers);
 
     // Sidebar text update
-    const areaName = profile?.areas?.name || 'Invitado';
+    const areaName = profile?.area_id ? (this.ui.dataManager.areas.find(a => a.id === profile.area_id)?.name || 'Área') : 'Sin área';
     let roleLabel = 'Invitado';
     if (isSuperAdmin) roleLabel = 'Super Admin';
     else if (isGlobalAdmin) roleLabel = 'Admin Global';
@@ -961,8 +964,9 @@ class UIController {
         // Fallback: Extract from projects
         const uniqueAreas = new Map();
         this.dataManager.projects.forEach(p => {
-          if (p.areas) {
-            uniqueAreas.set(p.area_id, p.areas.name);
+          const area = this.dataManager.areas.find(a => a.id === p.area_id);
+          if (area) {
+            uniqueAreas.set(p.area_id, area.name);
           }
         });
 
@@ -1010,6 +1014,9 @@ class UIController {
             <button class="btn-icon btn-secondary" onclick="event.stopPropagation(); ui.editProject('${project.id}')" title="Editar proyecto">
               ✏️
             </button>
+            <button class="btn-icon btn-secondary" onclick="event.stopPropagation(); ui.openTransferModal('project', '${project.id}')" title="Transferir proyecto">
+              🔄
+            </button>
             <button class="btn-icon btn-secondary" onclick="event.stopPropagation(); ui.deleteProject('${project.id}')" title="Eliminar proyecto">
               🗑️
             </button>
@@ -1027,7 +1034,7 @@ class UIController {
             </div>
           </div>
           <div class="project-stats">
-            ${project.areas ? `<div class="project-stat"><span>🏢</span><span>${this.escapeHtml(project.areas.name)}</span></div>` : ''}
+            ${project.area_id ? `<div class="project-stat"><span>🏢</span><span>${this.escapeHtml(this.dataManager.areas.find(a => a.id === project.area_id)?.name || 'Área')}</span></div>` : ''}
             <div class="project-stat">
               <span>📋</span>
               <span>${tasks.length} tareas</span>
@@ -1197,6 +1204,9 @@ class UIController {
           <button class="btn-icon btn-secondary" onclick="ui.editTask('${task.id}')" title="Editar tarea">
             ✏️
           </button>
+          <button class="btn-icon btn-secondary" onclick="ui.openTransferModal('task', '${task.id}')" title="Transferir tarea">
+            🔄
+          </button>
           <button class="btn-icon btn-secondary" onclick="ui.deleteTask('${task.id}')" title="Eliminar tarea">
             🗑️
           </button>
@@ -1310,9 +1320,19 @@ class UIController {
         submitText.textContent = 'Guardar Cambios';
       }
     } else {
-      document.getElementById('project-id').value = '';
       title.textContent = 'Nuevo Proyecto';
       submitText.textContent = 'Crear Proyecto';
+    }
+
+    // Populate user select for projects
+    const userSelect = document.getElementById('project-assigned-user');
+    if (userSelect && this.dataManager.users.length > 0) {
+      const currentAssigned = projectId ? this.dataManager.getProject(projectId)?.assignedTo : auth.user?.id;
+      userSelect.innerHTML = '<option value="">Sin asignar</option>' +
+        this.dataManager.users.map(u => {
+          let nameToDisplay = u.username || u.email.split('@')[0];
+          return `<option value="${u.id}" ${u.id === currentAssigned ? 'selected' : ''}>${this.escapeHtml(nameToDisplay)}</option>`;
+        }).join('');
     }
 
     modal.classList.remove('hidden');
@@ -1337,7 +1357,8 @@ class UIController {
     const projectData = {
       name: document.getElementById('project-name').value,
       description: document.getElementById('project-description').value,
-      status: document.getElementById('project-status').value
+      status: document.getElementById('project-status').value,
+      assignedTo: document.getElementById('project-assigned-user')?.value || null
     };
 
     try {
@@ -1414,6 +1435,30 @@ class UIController {
     submitText.textContent = 'Crear Tarea';
 
     modal.classList.remove('hidden');
+  }
+
+  openTransferModal(type, id) {
+    if (type === 'project') {
+      this.editProject(id);
+      setTimeout(() => {
+        const select = document.getElementById('project-assigned-user');
+        if (select) {
+          select.focus();
+          select.classList.add('highlight-flash');
+          setTimeout(() => select.classList.remove('highlight-flash'), 2000);
+        }
+      }, 100);
+    } else {
+      this.editTask(id);
+      setTimeout(() => {
+        const select = document.getElementById('task-assigned-user');
+        if (select) {
+          select.focus();
+          select.classList.add('highlight-flash');
+          setTimeout(() => select.classList.remove('highlight-flash'), 2000);
+        }
+      }, 100);
+    }
   }
 
   closeTaskModal() {
@@ -1915,9 +1960,9 @@ ui.setupSettingsTabs = function () {
 
       // Load data for tab
       if (tabName === 'areas') {
-        this.renderAreasManagement();
+        this.renderAreasView();
       } else if (tabName === 'users') {
-        this.renderUsersManagement();
+        this.renderUsersView();
       } else if (tabName === 'profile') {
         this.loadProfileData();
       }
@@ -2035,7 +2080,7 @@ ui.renderUsersView = async function () {
   try {
     let query = clientSB
       .from('profiles')
-      .select('*, areas(name)');
+      .select('*');
     //.order('created_at', { ascending: false }); // Column might not exist
 
     // Global Roles see all. Area Leaders only see their area.
@@ -2078,7 +2123,7 @@ ui.renderUsersView = async function () {
             <span class="badge badge-${roleColors[user.role] || 'pending'}">${roleNames[user.role] || user.role}</span>
           </div>
           <div class="task-meta">
-            ${user.areas ? `<span>🏢 Área: <strong>${this.escapeHtml(user.areas.name)}</strong></span>` : '<span>🌐 Sin área asignada</span>'}
+            ${user.area_id ? `<span>🏢 Área: <strong>${this.escapeHtml(this.dataManager.areas.find(a => a.id === user.area_id)?.name || 'Cargando...')}</strong></span>` : '<span>🌐 Sin área asignada</span>'}
             <span>📅 Desde: ${user.created_at && !isNaN(new Date(user.created_at)) ? new Date(user.created_at).toLocaleDateString() : 'Sin fecha'}</span>
           </div>
         </div>
@@ -2279,7 +2324,7 @@ ui.viewUserDetails = async function (userId) {
     // 1. Fetch user profile
     const { data: user, error: userError } = await clientSB
       .from('profiles')
-      .select('*, areas(name)')
+      .select('*')
       .eq('id', userId)
       .single();
 
@@ -2301,7 +2346,7 @@ ui.viewUserDetails = async function (userId) {
         <p class="text-sm opacity-70 mb-sm">${user.email}</p>
         <div class="flex gap-sm">
           <span class="badge badge-progress">${user.role}</span>
-          ${user.areas ? `<span class="badge badge-pending">${this.escapeHtml(user.areas.name)}</span>` : ''}
+          ${user.area_id ? `<span class="badge badge-pending">${this.escapeHtml(this.dataManager.areas.find(a => a.id === user.area_id)?.name || 'Área')}</span>` : ''}
         </div>
       </div>
     `;
@@ -2311,8 +2356,11 @@ ui.viewUserDetails = async function (userId) {
       tasksContainer.innerHTML = '<div class="empty-state">No tiene tareas asignadas</div>';
       projectsContainer.innerHTML = '<div class="empty-state">No participa en proyectos</div>';
     } else {
-      // Group unique projects
-      const uniqueProjects = Array.from(new Set(tasks.map(t => t.projects?.name).filter(Boolean)));
+      // Group unique projects - Manual lookup to avoid join issues if user details triggers it
+      const uniqueProjects = Array.from(new Set(tasks.map(t => {
+        const p = this.dataManager.projects.find(proj => proj.id === t.project_id);
+        return p ? p.name : null;
+      }).filter(Boolean)));
       projectsContainer.innerHTML = uniqueProjects.map(p => `
         <div class="card p-sm border-accent">
           <div class="font-bold">📁 ${this.escapeHtml(p)}</div>
@@ -2570,28 +2618,36 @@ ui.populateReportsFilters = function () {
   }
 
   if (userSelect) {
-    if (!isSuper && !isLeader && !auth.isGlobalAdmin()) {
-      userSelect.classList.add('hidden');
-    } else {
-      userSelect.classList.remove('hidden');
-      const currentValue = userSelect.value;
-      userSelect.innerHTML = '<option value="all">Todos los Usuarios</option>';
+    const isSuper = auth.isAdmin() || auth.isSuperManager();
+    const isGlobal = auth.isGlobalAdmin();
+    const isLeader = auth.isAreaLeader();
+    const profile = this.dataManager.profile;
 
-      let usersToDisplay = this.dataManager.users;
-      if (isLeader && !isSuper) {
+    userSelect.classList.remove('hidden'); // Ensure visible
+    const currentValue = userSelect.value;
+    userSelect.innerHTML = '<option value="all">Todos los Usuarios</option>';
+
+    let usersToDisplay = this.dataManager.users;
+
+    if (!isSuper && !isGlobal) {
+      if (isLeader) {
         usersToDisplay = usersToDisplay.filter(u => u.area_id === profile.area_id);
-      } else if (profile?.role === 'lider_data') {
-        usersToDisplay = usersToDisplay.filter(u => this.dataManager.allowedAreas.includes(u.area_id));
+      } else {
+        // Normal users only see themselves in the filter
+        usersToDisplay = usersToDisplay.filter(u => u.id === auth.user?.id);
+        if (usersToDisplay.length > 0) {
+          userSelect.innerHTML = ''; // Remove "All" if restricted to self
+        }
       }
-
-      usersToDisplay.forEach(u => {
-        const opt = document.createElement('option');
-        opt.value = u.id;
-        opt.textContent = u.username || u.email.split('@')[0];
-        userSelect.appendChild(opt);
-      });
-      userSelect.value = currentValue || 'all';
     }
+
+    usersToDisplay.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.id;
+      opt.textContent = u.username || u.email.split('@')[0];
+      userSelect.appendChild(opt);
+    });
+    userSelect.value = currentValue || 'all';
   }
 };
 

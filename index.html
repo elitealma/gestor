@@ -14,8 +14,8 @@
     rel="stylesheet">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="styles.css?v=3.1.0">
-  <link rel="stylesheet" href="kanban.css?v=3.1.0">
+  <link rel="stylesheet" href="styles.css?v=3.1.1">
+  <link rel="stylesheet" href="kanban.css?v=3.1.1">
 
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -463,6 +463,13 @@
           </select>
         </div>
 
+        <div class="form-group">
+          <label class="form-label" for="project-assigned-user">Asignado a</label>
+          <select id="project-assigned-user" class="form-select">
+            <option value="">Sin asignar</option>
+          </select>
+        </div>
+
         <div class="form-actions">
           <button type="button" class="btn btn-secondary" id="cancel-project">Cancelar</button>
           <button type="submit" class="btn btn-primary">
@@ -729,8 +736,8 @@
   </div>
 
   <!-- JavaScript -->
-  <script src="app.js?v=3.1.0"></script>
-  <script src="kanban.js?v=3.1.0"></script>
+  <script src="app.js?v=3.1.1"></script>
+  <script src="kanban.js?v=3.1.1"></script>
 </body>
 
 </html>
