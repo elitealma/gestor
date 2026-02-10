@@ -20,6 +20,7 @@ class DataManager {
     this.currentView = 'dashboard';
     this.realtimeSubscriptions = []; // Real-time subscriptions
     this.selectedProjectId = null; // For filtering tasks by project
+    this.allowedAreas = []; // For lider_data multi-area access
   }
 
   // Supabase Data Fetching
@@ -74,14 +75,31 @@ class DataManager {
       */
       const isGlobalPower = this.profile?.role === 'super_admin' || this.profile?.role === 'super_manager' || this.profile?.role === 'admin';
 
-      if (this.profile && !isGlobalPower && this.profile.area_id) {
-        if (this.profile.role === 'area_leader') {
-          // Special case for Area Leaders: their area OR is_shared
+      // Fetch allowed areas for lider_data
+      this.allowedAreas = [];
+      if (this.profile?.role === 'lider_data') {
+        const { data: allowed } = await clientSB
+          .from('profile_areas')
+          .select('area_id')
+          .eq('profile_id', this.profile.id);
+        this.allowedAreas = (allowed || []).map(a => a.area_id);
+      }
+
+      if (this.profile && !isGlobalPower) {
+        if (this.profile.role === 'area_leader' && this.profile.area_id) {
+          // Area Leaders: their area OR shared
           projectsQuery = projectsQuery.or(`area_id.eq.${this.profile.area_id},is_shared.eq.true`);
-        } else {
+          tasksQuery = tasksQuery.eq('area_id', this.profile.area_id);
+        } else if (this.profile.role === 'lider_data' && this.allowedAreas.length > 0) {
+          // Lider Data: multiple specific areas OR shared
+          const areaFilterStr = `area_id.in.(${this.allowedAreas.join(',')})`;
+          projectsQuery = projectsQuery.or(`${areaFilterStr},is_shared.eq.true`);
+          tasksQuery = tasksQuery.filter('area_id', 'in', `(${this.allowedAreas.join(',')})`);
+        } else if (this.profile.role === 'user' && this.profile.area_id) {
+          // Standard Users: their area
           projectsQuery = projectsQuery.eq('area_id', this.profile.area_id);
+          tasksQuery = tasksQuery.eq('area_id', this.profile.area_id);
         }
-        tasksQuery = tasksQuery.eq('area_id', this.profile.area_id);
       }
 
       console.log(`[DataManager] Fetching data for role: ${this.profile?.role || 'guest'}, area: ${this.profile?.area_id || 'all'}`);
@@ -2393,6 +2411,9 @@ ui.renderReportsView = function () {
     if (isLeader) {
       // Area leaders see all tasks in their area
       filteredTasks = filteredTasks.filter(t => t.area_id === profile.area_id);
+    } else if (profile?.role === 'lider_data') {
+      // Data leaders see tasks in their allowed areas
+      filteredTasks = filteredTasks.filter(t => this.dataManager.allowedAreas.includes(t.area_id));
     } else {
       // Normal users only see their own tasks
       filteredTasks = filteredTasks.filter(t => t.assignedTo === auth.user?.id);
@@ -2532,7 +2553,13 @@ ui.populateReportsFilters = function () {
       areaSelect.classList.remove('hidden');
       const currentValue = areaSelect.value;
       areaSelect.innerHTML = '<option value="all">Todas las Áreas</option>';
-      this.dataManager.areas.forEach(a => {
+
+      let areasToDisplay = this.dataManager.areas;
+      if (profile?.role === 'lider_data') {
+        areasToDisplay = areasToDisplay.filter(a => this.dataManager.allowedAreas.includes(a.id));
+      }
+
+      areasToDisplay.forEach(a => {
         const opt = document.createElement('option');
         opt.value = a.id;
         opt.textContent = a.name;
@@ -2553,6 +2580,8 @@ ui.populateReportsFilters = function () {
       let usersToDisplay = this.dataManager.users;
       if (isLeader && !isSuper) {
         usersToDisplay = usersToDisplay.filter(u => u.area_id === profile.area_id);
+      } else if (profile?.role === 'lider_data') {
+        usersToDisplay = usersToDisplay.filter(u => this.dataManager.allowedAreas.includes(u.area_id));
       }
 
       usersToDisplay.forEach(u => {
