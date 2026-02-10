@@ -2530,6 +2530,17 @@ ui.renderReportsView = function () {
   console.log('Rendering Charts with tasks:', filteredTasks.length);
 
   // Render Charts
+  const areaCard = document.getElementById('card-tasks-area');
+  const userCard = document.getElementById('card-tasks-user');
+
+  if (!isSuper && !isGlobal && !isLeader && profile?.role !== 'lider_data') {
+    if (areaCard) areaCard.classList.add('hidden');
+    if (userCard) userCard.classList.add('hidden');
+  } else {
+    if (areaCard) areaCard.classList.remove('hidden');
+    if (userCard) userCard.classList.remove('hidden');
+  }
+
   this.initChart('chart-tasks-status', 'pie', {
     labels: ['Pendientes', 'En Progreso', 'Completadas'],
     datasets: [{
@@ -2539,15 +2550,17 @@ ui.renderReportsView = function () {
     }]
   });
 
-  this.initChart('chart-tasks-area', 'bar', {
-    labels: Object.keys(areaData),
-    datasets: [{
-      label: 'Tareas por Área',
-      data: Object.values(areaData),
-      backgroundColor: '#667eea',
-      borderRadius: 6
-    }]
-  }, { indexAxis: 'y' });
+  if (areaCard && !areaCard.classList.contains('hidden')) {
+    this.initChart('chart-tasks-area', 'bar', {
+      labels: Object.keys(areaData),
+      datasets: [{
+        label: 'Tareas por Área',
+        data: Object.values(areaData),
+        backgroundColor: '#667eea',
+        borderRadius: 6
+      }]
+    }, { indexAxis: 'y' });
+  }
 
   this.initChart('chart-tasks-trend', 'line', {
     labels: trendLabels,
@@ -2561,15 +2574,17 @@ ui.renderReportsView = function () {
     }]
   });
 
-  this.initChart('chart-tasks-user', 'bar', {
-    labels: Object.keys(userData),
-    datasets: [{
-      label: 'Tareas por Usuario',
-      data: Object.values(userData),
-      backgroundColor: '#4facfe',
-      borderRadius: 6
-    }]
-  });
+  if (userCard && !userCard.classList.contains('hidden')) {
+    this.initChart('chart-tasks-user', 'bar', {
+      labels: Object.keys(userData),
+      datasets: [{
+        label: 'Tareas por Usuario',
+        data: Object.values(userData),
+        backgroundColor: '#4facfe',
+        borderRadius: 6
+      }]
+    });
+  }
 };
 
 ui.populateReportsFilters = function () {
