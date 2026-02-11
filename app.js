@@ -2349,14 +2349,32 @@ ui.viewUserDetails = async function (userId) {
     // Render Info
     infoContainer.innerHTML = `
       <div class="card bg-surface-variant p-md">
-        <h2 class="card-title mb-xs">${this.escapeHtml(user.username || user.email)}</h2>
-        <p class="text-sm opacity-70 mb-sm">${user.email}</p>
+        <div class="flex justify-between items-start">
+          <div>
+            <h2 class="card-title mb-xs">${this.escapeHtml(user.username || user.email)}</h2>
+            <p class="text-sm opacity-70 mb-sm">${user.email}</p>
+          </div>
+        </div>
         <div class="flex gap-sm">
           <span class="badge badge-progress">${user.role}</span>
           ${user.area_id ? `<span class="badge badge-pending">${this.escapeHtml(this.dataManager.areas.find(a => a.id === user.area_id)?.name || 'Área')}</span>` : ''}
         </div>
       </div>
     `;
+
+    // Setup Chat Button
+    const chatBtn = document.getElementById('user-details-chat');
+    if (chatBtn) {
+      if (user.id === auth.user.id) {
+        chatBtn.classList.add('hidden');
+      } else {
+        chatBtn.classList.remove('hidden');
+        chatBtn.onclick = () => {
+          modal.classList.add('hidden');
+          chatController.openDirectChat(user.id, user.username || user.email);
+        };
+      }
+    }
 
     // Render Tasks & Projects
     if (!tasks || tasks.length === 0) {
@@ -2747,6 +2765,52 @@ class ChatController {
     this.subscribeToMessages('chat-messages');
   }
 
+  async openDirectChat(memberId, memberName) {
+    document.getElementById('chat-title').textContent = `Chat con ${memberName}`;
+    document.getElementById('chat-modal').classList.remove('hidden');
+
+    // Find or create direct chat between me and member
+    // To identify a unique direct chat, we use type='direct' and check participants
+    // For simplicity, we can use a composite key or a naming convention, 
+    // but here we search for a chat of type 'direct' where both are participants.
+
+    // Quick search: find chats where I am participant AND other is participant
+    const { data: myChats } = await clientSB.from('chat_participants').select('chat_id').eq('profile_id', auth.user.id);
+    const { data: theirChats } = await clientSB.from('chat_participants').select('chat_id').eq('profile_id', memberId);
+
+    const myIds = (myChats || []).map(c => c.chat_id);
+    const commonIds = (theirChats || []).map(c => c.chat_id).filter(id => myIds.includes(id));
+
+    let chat = null;
+    if (commonIds.length > 0) {
+      const { data: existingChat } = await clientSB.from('chats')
+        .select('id')
+        .in('id', commonIds)
+        .eq('type', 'direct')
+        .single();
+      chat = existingChat;
+    }
+
+    if (!chat) {
+      const { data: newChat, error: createError } = await clientSB.from('chats').insert({
+        type: 'direct',
+        name: `Privado: ${memberName}`
+      }).select().single();
+
+      if (createError) throw createError;
+      chat = newChat;
+
+      await clientSB.from('chat_participants').insert([
+        { chat_id: chat.id, profile_id: auth.user.id },
+        { chat_id: chat.id, profile_id: memberId }
+      ]);
+    }
+
+    this.activeChatId = chat.id;
+    this.loadMessages('chat-messages');
+    this.subscribeToMessages('chat-messages');
+  }
+
   async loadMessages(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -2829,57 +2893,6 @@ class ChatController {
       })
       .subscribe();
   }
-
-  async renderTeamChatView() {
-    const profile = this.ui.dataManager.profile;
-    if (!profile?.area_id) {
-      document.getElementById('chat-list').innerHTML = '<div class="empty-state">No perteneces a ninguna área</div>';
-      return;
-    }
-
-    const { data: chats, error } = await clientSB
-      .from('chats')
-      .select('*')
-      .eq('area_id', profile.area_id)
-      .order('created_at', { ascending: false });
-
-    const chatList = document.getElementById('chat-list');
-    chatList.innerHTML = `
-        <div class="chat-list-item active" onclick="chatController.selectChat('team', '${profile.area_id}')">
-            <strong>📢 Chat de Área</strong>
-            <p class="text-xs opacity-70">General</p>
-        </div>
-        ${(chats || []).filter(c => c.type === 'task').map(c => `
-            <div class="chat-list-item" onclick="chatController.selectChat('chat_id', '${c.id}')">
-                <strong>💬 ${c.name || 'Chat de Tarea'}</strong>
-            </div>
-        `).join('')}
-    `;
-  }
-
-  async selectChat(type, value) {
-    // Implementación para la vista de chat de equipo
-    if (type === 'team') {
-      const { data: chat } = await clientSB.from('chats').select('id').eq('type', 'team').eq('area_id', value).single();
-      if (!chat) {
-        const { data: newChat } = await clientSB.from('chats').insert({ type: 'team', area_id: value, name: 'Chat General' }).select().single();
-        this.activeChatId = newChat.id;
-      } else {
-        this.activeChatId = chat.id;
-      }
-    } else {
-      this.activeChatId = value;
-    }
-
-    document.getElementById('team-chat-form').classList.remove('hidden');
-    document.getElementById('active-chat-name').textContent = 'Chat Activo';
-    this.loadMessages('team-chat-messages');
-    this.subscribeToMessages('team-chat-messages');
-
-    // Update active class in sidebar
-    document.querySelectorAll('.chat-list-item').forEach(el => el.classList.remove('active'));
-    // (Actualizar visualmente el item seleccionado requiere una lógica más específica de DOM)
-  }
 }
 
 const chatController = new ChatController(ui);
@@ -2894,18 +2907,6 @@ document.getElementById('chat-form')?.addEventListener('submit', (e) => {
   e.preventDefault();
   const input = document.getElementById('chat-input');
   chatController.sendMessage(input.value, 'chat-input');
-});
-
-document.getElementById('team-chat-form')?.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const input = document.getElementById('team-chat-input');
-  chatController.sendMessage(input.value, 'team-chat-input');
-});
-
-// Sidebar Navigation
-document.getElementById('nav-chats')?.addEventListener('click', () => {
-  ui.switchView('chats');
-  chatController.renderTeamChatView();
 });
 
 console.log(' Fase 5: Módulo de Chat cargado');

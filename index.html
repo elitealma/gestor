@@ -57,10 +57,6 @@
             <span class="nav-icon">📊</span>
             <span>Reportes</span>
           </li>
-          <li class="nav-item" data-view="chats" id="nav-chats">
-            <span class="nav-icon">💬</span>
-            <span>Chat Equipo</span>
-          </li>
 
           <li class="nav-divider"></li>
 
@@ -733,8 +729,9 @@
           </div>
         </div>
       </div>
-      <div class="modal-footer mt-lg">
-        <button type="button" class="btn btn-secondary w-full" id="btn-close-user-details">Cerrar</button>
+      <div class="modal-footer mt-lg flex gap-sm">
+        <button type="button" class="btn btn-primary flex-1" id="user-details-chat">💬 Enviar Mensaje</button>
+        <button type="button" class="btn btn-secondary" id="btn-close-user-details">Cerrar</button>
       </div>
     </div>
   </div>
@@ -760,36 +757,6 @@
     </div>
   </div>
 
-  <!-- Chat View (Team Chat) -->
-  <section id="chats-view" class="view hidden">
-    <div class="content-header">
-      <h1 class="content-title">Chat de Equipo</h1>
-      <p class="content-subtitle">Conversaciones con tu área y equipo</p>
-    </div>
-    <div class="chat-layout card">
-      <div class="chat-sidebar">
-        <div class="chat-sidebar-header">
-          <h3>Conversaciones</h3>
-        </div>
-        <div id="chat-list" class="chat-list">
-          <!-- Lista de chats (Área, Tareas, etc) -->
-        </div>
-      </div>
-      <div class="chat-main">
-        <div id="active-chat-header" class="active-chat-header">
-          <h3 id="active-chat-name">Selecciona un chat</h3>
-        </div>
-        <div id="team-chat-messages" class="chat-messages">
-          <div class="empty-status">Selecciona una conversación para empezar</div>
-        </div>
-        <form id="team-chat-form" class="chat-form hidden">
-          <input type="text" id="team-chat-input" class="form-input" placeholder="Escribe un mensaje..." required
-            autocomplete="off">
-          <button type="submit" class="btn btn-primary">Enviar</button>
-        </form>
-      </div>
-    </div>
-  </section>
 
   <!-- JavaScript -->
   <script src="app.js?v=3.1.1"></script>
