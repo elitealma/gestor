@@ -2245,16 +2245,23 @@ document.getElementById('user-form')?.addEventListener('submit', async (e) => {
   submitBtn.textContent = userId ? 'Actualizando...' : 'Creando...';
 
   try {
+    const profile = ui.dataManager.profile;
+    const isAreaLeader = profile?.role === 'area_leader';
+
+    // Enforcement: Area leaders can only create users in their own area
+    const finalAreaId = isAreaLeader ? profile.area_id : areaId;
+    const finalRole = isAreaLeader ? 'user' : role;
+
     if (userId) {
       // Update existing profile
-      const updateData = { username, role, area_id: areaId };
+      const updateData = { username, role: finalRole, area_id: finalAreaId };
       const { error } = await clientSB.from('profiles').update(updateData).eq('id', userId);
       if (error) throw error;
       alert('✅ Usuario actualizado exitosamente');
     } else {
       // Create new user
       if (!password) throw new Error('Se requiere contraseña para nuevos usuarios');
-      await createUserWithUsername(username, password, role, areaId);
+      await createUserWithUsername(username, password, finalRole, finalAreaId);
       alert('✅ Usuario creado exitosamente');
     }
 
@@ -2696,5 +2703,210 @@ ui.initChart = function (id, type, data, options = {}) {
   });
 };
 
-console.log(' Fase 4: Reportes y KPIs cargados');
+
+// ===== CHAT CONTROLLER =====
+class ChatController {
+  constructor(ui) {
+    this.ui = ui;
+    this.activeChatId = null;
+    this.subscription = null;
+  }
+
+  async openTaskChat(taskId) {
+    const task = this.ui.dataManager.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    document.getElementById('chat-title').textContent = `Chat: ${task.title}`;
+    document.getElementById('chat-modal').classList.remove('hidden');
+
+    // Find or create chat for this task
+    let { data: chat, error } = await clientSB.from('chats').select('id').eq('task_id', taskId).single();
+
+    if (error && error.code === 'PGRST116') {
+      // Create new task chat
+      const { data: newChat, error: createError } = await clientSB.from('chats').insert({
+        task_id: taskId,
+        type: 'task',
+        area_id: task.area_id,
+        name: `Chat: ${task.title}`
+      }).select().single();
+
+      if (createError) throw createError;
+      chat = newChat;
+
+      // Add participants (Leader and Assigned User)
+      const participants = [{ chat_id: chat.id, profile_id: auth.user.id }];
+      if (task.assigned_to && task.assigned_to !== auth.user.id) {
+        participants.push({ chat_id: chat.id, profile_id: task.assigned_to });
+      }
+      await clientSB.from('chat_participants').insert(participants);
+    }
+
+    this.activeChatId = chat.id;
+    this.loadMessages('chat-messages');
+    this.subscribeToMessages('chat-messages');
+  }
+
+  async loadMessages(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const { data: messages, error } = await clientSB
+      .from('messages')
+      .select('*, profiles(username)')
+      .eq('chat_id', this.activeChatId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error loading messages:', error);
+      return;
+    }
+
+    if (messages.length === 0) {
+      container.innerHTML = '<div class="empty-state">No hay mensajes aún</div>';
+    } else {
+      container.innerHTML = messages.map(m => this.renderMessage(m)).join('');
+      container.scrollTop = container.scrollHeight;
+    }
+  }
+
+  renderMessage(msg) {
+    const isMe = msg.sender_id === auth.user.id;
+    const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const username = msg.profiles?.username || 'Usuario';
+
+    return `
+      <div class="message ${isMe ? 'message-out' : 'message-in'}">
+        ${!isMe ? `<div class="font-bold text-xs mb-1">${username}</div>` : ''}
+        <div class="message-content">${this.ui.escapeHtml(msg.content)}</div>
+        <div class="message-meta">
+          <span>${time}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  async sendMessage(content, inputId) {
+    if (!content.trim() || !this.activeChatId) return;
+
+    const { error } = await clientSB.from('messages').insert({
+      chat_id: this.activeChatId,
+      sender_id: auth.user.id,
+      content: content.trim()
+    });
+
+    if (error) {
+      alert('Error al enviar mensaje');
+    } else {
+      document.getElementById(inputId).value = '';
+    }
+  }
+
+  subscribeToMessages(containerId) {
+    if (this.subscription) clientSB.removeChannel(this.subscription);
+
+    this.subscription = clientSB
+      .channel(`chat:${this.activeChatId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `chat_id=eq.${this.activeChatId}`
+      }, async (payload) => {
+        // Fetch full message with profile
+        const { data: fullMsg } = await clientSB
+          .from('messages')
+          .select('*, profiles(username)')
+          .eq('id', payload.new.id)
+          .single();
+
+        const container = document.getElementById(containerId);
+        if (container) {
+          if (container.querySelector('.empty-state')) container.innerHTML = '';
+          container.insertAdjacentHTML('beforeend', this.renderMessage(fullMsg));
+          container.scrollTop = container.scrollHeight;
+        }
+      })
+      .subscribe();
+  }
+
+  async renderTeamChatView() {
+    const profile = this.ui.dataManager.profile;
+    if (!profile?.area_id) {
+      document.getElementById('chat-list').innerHTML = '<div class="empty-state">No perteneces a ninguna área</div>';
+      return;
+    }
+
+    const { data: chats, error } = await clientSB
+      .from('chats')
+      .select('*')
+      .eq('area_id', profile.area_id)
+      .order('created_at', { ascending: false });
+
+    const chatList = document.getElementById('chat-list');
+    chatList.innerHTML = `
+        <div class="chat-list-item active" onclick="chatController.selectChat('team', '${profile.area_id}')">
+            <strong>📢 Chat de Área</strong>
+            <p class="text-xs opacity-70">General</p>
+        </div>
+        ${(chats || []).filter(c => c.type === 'task').map(c => `
+            <div class="chat-list-item" onclick="chatController.selectChat('chat_id', '${c.id}')">
+                <strong>💬 ${c.name || 'Chat de Tarea'}</strong>
+            </div>
+        `).join('')}
+    `;
+  }
+
+  async selectChat(type, value) {
+    // Implementación para la vista de chat de equipo
+    if (type === 'team') {
+      const { data: chat } = await clientSB.from('chats').select('id').eq('type', 'team').eq('area_id', value).single();
+      if (!chat) {
+        const { data: newChat } = await clientSB.from('chats').insert({ type: 'team', area_id: value, name: 'Chat General' }).select().single();
+        this.activeChatId = newChat.id;
+      } else {
+        this.activeChatId = chat.id;
+      }
+    } else {
+      this.activeChatId = value;
+    }
+
+    document.getElementById('team-chat-form').classList.remove('hidden');
+    document.getElementById('active-chat-name').textContent = 'Chat Activo';
+    this.loadMessages('team-chat-messages');
+    this.subscribeToMessages('team-chat-messages');
+
+    // Update active class in sidebar
+    document.querySelectorAll('.chat-list-item').forEach(el => el.classList.remove('active'));
+    // (Actualizar visualmente el item seleccionado requiere una lógica más específica de DOM)
+  }
+}
+
+const chatController = new ChatController(ui);
+
+// Event Listeners for Chat
+document.getElementById('close-chat-modal')?.addEventListener('click', () => {
+  document.getElementById('chat-modal').classList.add('hidden');
+  if (chatController.subscription) clientSB.removeChannel(chatController.subscription);
+});
+
+document.getElementById('chat-form')?.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const input = document.getElementById('chat-input');
+  chatController.sendMessage(input.value, 'chat-input');
+});
+
+document.getElementById('team-chat-form')?.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const input = document.getElementById('team-chat-input');
+  chatController.sendMessage(input.value, 'team-chat-input');
+});
+
+// Sidebar Navigation
+document.getElementById('nav-chats')?.addEventListener('click', () => {
+  ui.switchView('chats');
+  chatController.renderTeamChatView();
+});
+
+console.log(' Fase 5: Módulo de Chat cargado');
 

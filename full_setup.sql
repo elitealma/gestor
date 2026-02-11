@@ -60,12 +60,13 @@ END $$;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, username, role)
+  INSERT INTO public.profiles (id, email, username, role, area_id)
   VALUES (
     NEW.id, 
     NEW.email, 
     COALESCE(NEW.raw_user_meta_data->>'username', split_part(NEW.email, '@', 1)),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'user')
+    COALESCE(NEW.raw_user_meta_data->>'role', 'user'),
+    (NEW.raw_user_meta_data->>'area_id')::uuid
   )
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
@@ -211,6 +212,25 @@ USING (
 )
 WITH CHECK (
   exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'super_admin')
+);
+
+-- Escritura: Area Leader puede gestionar perfiles de su propia área
+CREATE POLICY "Profiles Area Leader Manage" ON profiles FOR ALL
+USING (
+  exists (
+    select 1 from profiles p 
+    where p.id = auth.uid() 
+    and p.role = 'area_leader'
+    and p.area_id = profiles.area_id
+  )
+)
+WITH CHECK (
+  exists (
+    select 1 from profiles p 
+    where p.id = auth.uid() 
+    and p.role = 'area_leader'
+    and p.area_id = profiles.area_id
+  )
 );
 
 -- NOTA: El rol 'admin' (global viewer) no tiene políticas de escritura (FOR ALL, INSERT, UPDATE, DELETE),

@@ -30,11 +30,10 @@ UIController.prototype.renderKanbanCard = function (task) {
     <div class="kanban-task-card" draggable="${canEdit ? 'true' : 'false'}" data-task-id="${task.id}" data-task-status="${task.status}">
         <div class="card-header">
             ${project ? `<span class="card-project-tag">${this.escapeHtml(project.name)}</span>` : '<span class="card-project-tag" style="opacity:0.5">Sin Proyecto</span>'}
-            ${canEdit ? `
-                <div class="card-actions editor-only">
-                     <button class="btn-icon-small" onclick="ui.editTask('${task.id}')" title="Editar">✏️</button>
-                </div>
-            ` : ''}
+            <div class="card-actions">
+                 <button class="btn-icon-small btn-chat" onclick="chatController.openTaskChat('${task.id}')" title="Chat de Tarea">💬</button>
+                 ${canEdit ? `<button class="btn-icon-small editor-only" onclick="ui.editTask('${task.id}')" title="Editar">✏️</button>` : ''}
+            </div>
         </div>
         
         <div class="kanban-task-title">${this.escapeHtml(task.title)}</div>
